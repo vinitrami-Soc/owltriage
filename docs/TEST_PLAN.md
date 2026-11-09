@@ -1,85 +1,91 @@
-# Test Plan: Blue Team Auto-Triage
-
-**Status:** 122 tests passing · 96% line coverage of `triage/` · mutation score 13/13 · ~47,000 log lines/sec
+# Test plan
 
 ## Run it
 
 ```bash
-pip install -r requirements-dev.txt
-python -m pytest                                  # everything (~25 s)
-python -m pytest --cov=triage --cov-report=term-missing
-python -m pytest tests/test_log_parser.py tests/test_detectors.py   # fast inner loop (< 1 s)
-ruff check main.py triage/ tests/
+pip install -e ".[dev,evtx]"
+bluetriage rules test                     # every rule's match / no_match examples
+python -m pytest -q                       # full suite (~50 s)
+python -m pytest --cov=bluetriage         # with coverage
+ruff check bluetriage tests main.py
+
+# regression on ~280 real attack recordings (also a CI job)
+git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx-samples
+BLUETRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
 ```
 
 ## Strategy
 
-This is a security tool whose input (log lines, alert JSON) is written by attackers. So beyond "does it detect attacks", the plan focuses on what happens when the input is hostile, malformed, huge, or when an external service misbehaves.
+bluetriage reads input written by attackers (logs, event exports, alerts) and its output
+drives firewall changes and team notifications. So besides "does it detect attacks", the
+suite proves what happens when input is hostile, malformed, huge or from another tool
+version, and when an external service misbehaves.
 
-```
-            E2E (15)            main.py as a subprocess, real files, exit codes
-        Integration (11)        real HTTP to a local fake SOC + generated bash run against a fake iptables
-     Security / robustness (33) hostile input, malformed alerts, fuzzing, ReDoS, platform limits
-          Unit (61)             parser, detectors, defense planner, API response parsing
-        Performance (2)         throughput, memory stays flat as files grow
-```
+| Layer | Where | What it proves |
+|---|---|---|
+| Rule self-tests | `bluetriage/rules/*.yml` → `test_rules.py` | Each of the 53 regex/event rules matches its `match` examples and none of its `no_match` look-alikes (160+ examples); every rule has both kinds; ATT&CK IDs exist; invalid rules fail loudly with file + rule id |
+| Unit | `test_log_parser.py`, `test_detectors.py`, `test_defense.py`, `test_pipeline.py` | Parsing, brute-force thresholds, compromise logic, web signatures, block-rule planning, API response parsing |
+| Windows | `test_windows.py` | wevtutil XML, UTF-16 exports, Winlogbeat/flat JSON, Kerberos 4768/4771 spraying, PowerShell 4104, Sysmon 3 outbound, UTF-16 `-enc` decoding, truncated XML, XML entity refusal, missing optional `evtx` package |
+| Time windows & feeds | `test_feeds_exporters.py` | Window boundaries, feed download (size cap, HTTP errors, HTML instead of a list, atomic write), private/huge ranges refused, prefix-index lookups equal a naive scan (Hypothesis) |
+| Exports | `test_feeds_exporters.py` | STIX 2.1 validated by the official `stix2` library with deterministic IDs, ATT&CK Navigator layer, ECS-style NDJSON, IOC CSV |
+| HTTP integration | `test_http_integration.py` | Real HTTP to a local fake VirusTotal/AbuseIPDB/Discord/Slack/TheHive: headers, auth, 401/429/502, timeouts, partial TheHive failures |
+| E2E | `test_cli.py`, `test_block_script.py` | The CLI as a subprocess (exit codes 0/1/2, `--demo`, `--quiet`, `--allow`, `--fail-on`, custom and overriding rules, cached feeds, NDJSON alerts); `block_ips.sh` executed against a fake `iptables` (idempotent, undo, aborts on failure) |
+| Security & robustness | `test_security_robustness.py` | ANSI/markup/bidi injection, forged report lines, `@everyone`, Discord/Slack size limits, malformed alerts, Hypothesis fuzzing, ReDoS inputs, no Trojan-Source characters in the repo |
+| Real attacks | `test_real_evtx.py` | ~280 EVTX-ATTACK-SAMPLES files parse without crashing; 12 known attacks stay detected |
+| Performance | `test_performance.py` | 100k lines well under the limit; memory does not grow with file size |
 
-## Coverage by area
-
-| Area | Test type | File | What is proven |
-|---|---|---|---|
-| Log parsing | Unit | `test_log_parser.py` | SSH failed/accepted/invalid-user lines, `message repeated N times`, IPv6 and IPv4-mapped IPs, invalid IPs rejected, triple URL-decoding |
-| Detection rules | Unit | `test_detectors.py` | Brute-force threshold boundary, password spraying, compromise-after-brute-force, CIDR blocklist, 8 attack payloads detected, 6 benign URLs **not** flagged, base64 noise ignored |
-| Sample attack story | Regression | `test_reports_and_config.py` | Every planted attack in `data/` is found and every legitimate IP stays CLEAN |
-| Firewall rules | Unit + Integration | `test_defense.py`, `test_block_script.py` | Only validated, canonical IPs reach `iptables`; allowlist/loopback never blocked; generated script **actually executed** against a fake `iptables`: idempotent on re-run, undo works, aborts on failure |
-| Threat intel APIs | Unit + Integration | `test_pipeline.py`, `test_http_integration.py` | VirusTotal/AbuseIPDB parsing, the `> 5` boundary, 401/404/429/502, timeouts, unreachable hosts, rate limiter |
-| Notifications and cases | Integration | `test_http_integration.py` | Full live pipeline over HTTP: correct headers, auth, JSON bodies; TheHive 401 and partial observable failure |
-| Chat payload limits | Security | `test_security_robustness.py` | Discord 256/1024/4096/6000-char and 25-field limits, Slack 150/2000/3000, with 10,000-char inputs |
-| Hostile input | Security | `test_security_robustness.py` | ANSI escapes, OSC links, Rich markup, `\r`, bidi characters cannot reach the terminal or forge report lines; `@everyone` / `<!channel>` neutralized |
-| Malformed alerts | Robustness | `test_security_robustness.py` | 9 broken alert shapes (wrong types, missing keys, 200 KB fields) never crash |
-| Fuzzing | Property-based (Hypothesis) | `test_security_robustness.py` | 900 random inputs: analyzer never crashes, every block command matches a strict pattern |
-| ReDoS | Performance/Security | `test_security_robustness.py` | 6 pathological inputs (up to 200 KB) each finish in < 2 s |
-| CLI | E2E | `test_cli.py` | Exit codes 0/1/2, clear error messages and no tracebacks, `--allow`, `--fail-on`, `--svg`, NDJSON, run from any directory |
-| Config | Unit | `test_reports_and_config.py` | `.env` loading, environment overrides file, bad numbers give a readable error, secrets hidden from `repr` |
-| Source hygiene | Static | `test_security_robustness.py` + ruff | No hidden bidi/zero-width ("Trojan Source") characters anywhere in the repo |
+Python 3.9 (oldest supported) and 3.13 were both run locally with the full suite and the
+real-EVTX regression. CI covers 3.9-3.13 on Linux plus Windows and macOS.
 
 ## Mutation testing
 
-Bugs were deliberately injected into security-critical code, one at a time, to prove the suite catches them:
+Bugs are injected into security-critical code one at a time; each must make the suite fail.
 
 | Injected bug | Caught by |
 |---|---|
 | SSH IP-spoof protection removed | `test_crafted_username_cannot_spoof_the_source_ip` |
 | Brute-force threshold off by one | `test_brute_force_needs_threshold` |
+| Time window ignored | `test_slow_failures_outside_the_window_are_not_brute_force` |
+| Compromise detection removed | `test_demo_hunt_writes_every_output` |
+| Base64 printable filter disabled | `test_base64_of_control_bytes_is_ignored` |
+| PowerShell UTF-16 decoding removed | `test_windows_attack_story_is_detected` |
 | VirusTotal `> 5` becomes `>= 5` | `test_virustotal_threshold_boundary` |
-| Un-normalized IP reaches `iptables` | `test_equivalent_ip_spellings_become_one_canonical_rule` |
+| Un-normalized IP reaches iptables | `test_equivalent_ip_spellings_become_one_canonical_rule` |
+| Block script loses `set -e` | `test_script_stops_if_firewall_command_fails` |
 | Terminal sanitizer disabled | `test_hostile_log_content_cannot_control_the_terminal` |
 | Discord `@everyone` guard removed | `test_mock_pipeline_escalates_malicious_alert` |
-| Internal IPs sent to VirusTotal | `test_internal_and_agent_ips_are_not_sent_to_apis` |
-| Webhook error leaks the secret URL | `test_webhook_failure_never_leaks_the_url` |
-| Base64 printable filter disabled | `test_base64_of_control_bytes_is_ignored` |
-| Block script loses `set -e` | `test_script_stops_if_firewall_command_fails` |
-| CIDR blocklist matching broken | `test_hunt_writes_every_output` |
-| Compromise detection removed | `test_hunt_writes_every_output` |
 | Discord size budget removed | `test_chat_payloads_respect_platform_limits` |
+| Webhook error leaks the secret URL | `test_webhook_failure_never_leaks_the_url` |
+| Internal IPs sent to VirusTotal | `test_internal_and_agent_ips_are_not_sent_to_apis` |
+| CIDR lookup broken | `test_blocklist_matches_single_ips_and_cidr_ranges` |
+| Feeds allowed to flag private ranges | `test_cached_feeds_are_loaded_and_reported` |
+| defusedxml swapped for stdlib XML | `test_record_parser_refuses_entities_and_dtds` |
+| Kerberos 4768/4771 mapping removed | `test_kerberos_spraying_and_success` |
+| YAML `safe_load` → unsafe loader | `test_yaml_cannot_execute_code` |
+| Regex input bound removed | `test_rule_regexes_have_bounded_input` |
+| Unknown rule keys accepted | `test_invalid_rules_are_rejected_with_a_clear_message` |
+| Feed download size limit removed | `test_update_feeds_end_to_end` |
 
-The first run scored 10/13; the three survivors exposed missing boundary tests, which were then added.
+**Score: 22/22.** The first run scored 21/22: the bounded-input test used a rule whose own quantifier already limited it, so it could not tell. It now uses an unbounded pattern.
 
-## Bugs found by this testing (all fixed)
+## Bugs found by testing v2 (all fixed)
 
-| # | Bug | Impact |
+| Bug | Found by | Impact |
 |---|---|---|
-| 1 | Discord embed had no total-size budget; long alerts exceeded the 6,000-char / 4,096-char limits | Discord returns HTTP 400 and **the alert is silently lost** |
-| 2 | `rule.mitre.id` sent as a string (`"T1105"`) was split into `T`,`1`,`1`,`0`,`5` | Wrong TheHive tags |
-| 3 | Slack header block passed alert text through unescaped | `<!channel>`-style text reached Slack |
-| 4 | Literal invisible bidi characters (incl. U+202E) in `triage/utils.py` and a test file | GitHub "hidden Unicode" warning; Trojan-Source risk in a security tool |
-| 5 | IP parsing repeated for every line | +31% throughput after caching |
-| 6 | Invalid blocklist entries were reported without saying which entry | Hard to fix the file |
-| 7 | Block script was group-readable (`0o750`) | Now owner-only (`0o700`) |
+| Malformed / truncated XML raised `ParseError` (a `SyntaxError`, not `ValueError`) and aborted the whole hunt | `test_truncated_xml_keeps_parsed_events_and_warns` | One bad export would hide findings from every other file |
+| On Python 3.9, pip installs `evtx` 0.8.9, which joins unnamed `<Data>` values into one string; the ntds.dit rule only looked at `Data5` | Real-EVTX regression on 3.9 | Missed ntds.dit theft on 3.9; rules can now match any field with `'*'` |
+| Kerberos spraying with unknown usernames (4768 status 0x6) was not counted | Real sample `kerberos_pwd_spray_4771.evtx` | Missed kerbrute-style spraying and the compromise that followed |
+| Abbreviated `netsh I p a v` evaded the portproxy command rule | Real sample `de_portforward_netsh_rdp_sysmon_13_1.evtx` | Added a registry-based rule that renaming cannot dodge |
+| Obfuscated `IEX(... [char]0x53 ...)` payloads were only "low" | Real samples | New obfuscated-IEX rule (high) |
+| Throughput dropped with 4× more rules | Profiling | Cached timestamp parsing: about +20 % |
 
-## Known gaps (not covered)
+## Known gaps
 
-- **Real third-party services.** VirusTotal, AbuseIPDB, Discord, Slack and TheHive are exercised through a local fake that mimics their documented responses, not the live services. Run `python main.py alert --dry-run` with real keys once before relying on it.
-- **Real `iptables`.** The generated script runs against a fake `iptables` (no root needed). Test it on a disposable VM before production.
-- **Python versions.** Tests run on Python 3.13. `vermin` reports the code needs ≥ 3.7, and the README promises 3.9+, but no older interpreter was run.
-- **Windows.** The block-script tests need `bash` and are skipped without it.
+- Live services (VirusTotal, AbuseIPDB, Discord, Slack, TheHive, Wazuh) are exercised
+  through local fakes that follow their documented APIs, not the real services.
+- Real `iptables` is never run (a fake records the calls). Try `block_ips.sh` on a VM first.
+- The Dockerfile was not built here (no Docker daemon in the test environment).
+- Threat-feed downloads were tested live only for GitHub-hosted feeds (IPsum, FireHOL);
+  abuse.ch, blocklist.de and Emerging Threats were unreachable from the test sandbox.
+- No benign Windows corpus was available, so false-positive rates on busy Windows estates
+  are untested. Please report false positives with the issue template.

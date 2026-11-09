@@ -1,0 +1,228 @@
+# Windows event rules (Security, System and Sysmon channels).
+# Logon failures/successes (4625/4624), process creation (4688, Sysmon 1) and
+# Sysmon network connections (3) also feed the correlation and command rules.
+# In `match.fields` every regex must match (case-insensitive).
+
+- id: win-log-cleared
+  name: DEFENSE_EVASION
+  title: Windows event log cleared
+  type: event
+  severity: high
+  mitre: [T1070.001]
+  match:
+    event_id: [1102, 104]
+    provider: Microsoft-Windows-Eventlog
+  detail: "cleared by {SubjectUserName}"
+  tests:
+    match: [{event_id: 1102, provider: Microsoft-Windows-Eventlog, SubjectUserName: administrator}]
+    no_match: [{event_id: 1102, provider: Some-Other-Provider}]
+
+- id: win-account-created
+  name: PERSISTENCE
+  title: User account created
+  type: event
+  severity: medium
+  mitre: [T1136.001]
+  match:
+    event_id: 4720
+  detail: "{TargetUserName} created by {SubjectUserName}"
+  tests:
+    match: [{event_id: 4720, TargetUserName: support_svc, SubjectUserName: administrator}]
+    no_match: [{event_id: 4722, TargetUserName: support_svc}]
+
+- id: win-privileged-group-add
+  name: PRIVILEGE_ESCALATION
+  title: Account added to privileged group
+  type: event
+  severity: high
+  mitre: [T1098]
+  match:
+    event_id: [4728, 4732, 4756]
+    fields:
+      TargetUserName: '^(?:administrators|domain admins|enterprise admins|schema admins|backup operators)$'
+  detail: "{MemberName} {MemberSid} added to {TargetUserName} by {SubjectUserName}"
+  tests:
+    match: [{event_id: 4732, TargetUserName: Administrators, MemberSid: S-1-5-21-1-1001, SubjectUserName: administrator}]
+    no_match: [{event_id: 4732, TargetUserName: Remote Desktop Users}]
+
+- id: win-service-suspicious-path
+  name: PERSISTENCE
+  title: Service installed from a suspicious location
+  type: event
+  severity: high
+  mitre: [T1543.003]
+  match:
+    event_id: 7045
+    fields:
+      ImagePath: '\\(?:users|temp|appdata|programdata|windows\\temp)\\|%temp%|%appdata%|powershell|cmd(?:\.exe)?\s+/c'
+  detail: "{ServiceName}: {ImagePath}"
+  tests:
+    match: [{event_id: 7045, ServiceName: WinUpdateSvc, ImagePath: 'C:\Users\Public\svc.exe'}]
+    no_match: [{event_id: 7045, ServiceName: Spooler, ImagePath: 'C:\Windows\System32\spoolsv.exe'}]
+
+- id: win-psexec-service
+  name: LATERAL_MOVEMENT
+  title: PsExec-style remote service
+  type: event
+  severity: high
+  mitre: [T1569.002, T1021.002]
+  match:
+    event_id: 7045
+    fields:
+      ImagePath: 'psexesvc|\\\\[^\\]+\\admin\$'
+  detail: "{ServiceName}: {ImagePath}"
+  tests:
+    match: [{event_id: 7045, ServiceName: PSEXESVC, ImagePath: '%SystemRoot%\PSEXESVC.exe'}]
+    no_match: [{event_id: 7045, ServiceName: Spooler, ImagePath: 'C:\Windows\System32\spoolsv.exe'}]
+
+- id: win-scheduled-task-created
+  name: PERSISTENCE
+  title: Scheduled task created
+  type: event
+  severity: medium
+  mitre: [T1053.005]
+  match:
+    event_id: 4698
+  detail: "{TaskName} by {SubjectUserName}"
+  tests:
+    match: [{event_id: 4698, TaskName: '\Updater', SubjectUserName: administrator}]
+    no_match: [{event_id: 4699, TaskName: '\Updater'}]
+
+- id: win-audit-policy-changed
+  name: DEFENSE_EVASION
+  title: Audit policy changed
+  type: event
+  severity: medium
+  mitre: [T1562.002]
+  match:
+    event_id: 4719
+  detail: "by {SubjectUserName}"
+  tests:
+    match: [{event_id: 4719, SubjectUserName: administrator}]
+    no_match: [{event_id: 4720}]
+
+- id: win-kerberoasting
+  name: CREDENTIAL_ACCESS
+  title: Kerberoasting (RC4 service ticket)
+  type: event
+  severity: medium
+  mitre: [T1558.003]
+  match:
+    event_id: 4769
+    fields:
+      TicketEncryptionType: '^0x17$'
+      ServiceName: '^(?!krbtgt$)(?!.*\$$).+'
+      Status: '^0x0$'
+  detail: "{TargetUserName} requested an RC4 ticket for {ServiceName}"
+  false_positives: ["Legacy applications that still require RC4"]
+  tests:
+    match: [{event_id: 4769, TicketEncryptionType: '0x17', ServiceName: svc_sql, Status: '0x0', TargetUserName: bob}]
+    no_match: [{event_id: 4769, TicketEncryptionType: '0x12', ServiceName: svc_sql, Status: '0x0'}, {event_id: 4769, TicketEncryptionType: '0x17', ServiceName: 'DC01$', Status: '0x0'}]
+
+- id: win-sysmon-lsass-access
+  name: CREDENTIAL_DUMPING
+  title: Process opened LSASS memory (Sysmon)
+  type: event
+  severity: high
+  mitre: [T1003.001]
+  match:
+    event_id: 10
+    provider: Microsoft-Windows-Sysmon
+    fields:
+      TargetImage: '\\lsass\.exe$'
+      GrantedAccess: '^0x(?:1010|1410|1438|143a|1fffff)$'
+  detail: "{SourceImage} -> {TargetImage} ({GrantedAccess})"
+  false_positives: ["Some EDR/AV products; allowlist them by SourceImage in your own rule override"]
+  tests:
+    match: [{event_id: 10, provider: Microsoft-Windows-Sysmon, SourceImage: 'C:\Users\Public\p.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1010'}]
+    no_match: [{event_id: 10, provider: Microsoft-Windows-Sysmon, TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1000'}]
+
+- id: win-dcsync
+  name: CREDENTIAL_DUMPING
+  title: DCSync (directory replication by a non-DC account)
+  type: event
+  severity: critical
+  mitre: [T1003.006]
+  match:
+    event_id: 4662
+    fields:
+      Properties: '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2|1131f6ad-9c07-11d1-f79f-00c04fc2dcd2|89e95b76-444d-4c62-991a-0facbeda640c'
+      SubjectUserName: '^(?!.*\$$).+'
+  detail: "replication rights used by {SubjectUserName}"
+  false_positives: ["Azure AD Connect / Entra Connect sync accounts: allowlist them in a rule override"]
+  tests:
+    match: [{event_id: 4662, SubjectUserName: Administrator, Properties: "%%7688 {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"}]
+    no_match: [{event_id: 4662, SubjectUserName: 'DC02$', Properties: "%%7688 {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"}]
+
+- id: win-lsass-handle
+  name: CREDENTIAL_DUMPING
+  title: Handle to LSASS requested (object access audit)
+  type: event
+  severity: high
+  mitre: [T1003.001]
+  match:
+    event_id: [4656, 4663]
+    fields:
+      ObjectName: '\\lsass\.exe$'
+      ProcessName: '^(?!.*\\(?:MsMpEng|wininit|csrss|services|svchost|lsm|taskmgr|wmiprvse)\.exe$).+'
+  detail: "{ProcessName} opened lsass.exe ({AccessMask}) as {SubjectUserName}"
+  false_positives: ["Security products not in the built-in allowlist"]
+  tests:
+    match: [{event_id: 4656, ObjectName: '\Device\HarddiskVolume1\Windows\System32\lsass.exe', ProcessName: 'C:\Windows\System32\cscript.exe'}]
+    no_match: [{event_id: 4656, ObjectName: '\Device\HarddiskVolume1\Windows\System32\lsass.exe', ProcessName: 'C:\ProgramData\Microsoft\Windows Defender\Platform\4.18\MsMpEng.exe'}]
+
+- id: win-ntds-snapshot
+  name: CREDENTIAL_DUMPING
+  title: ntds.dit opened from a snapshot or copy (ESENT)
+  type: event
+  severity: critical
+  mitre: [T1003.003]
+  match:
+    event_id: [325, 326, 327]
+    provider: ESENT
+    fields:
+      # ESENT <Data> elements are unnamed, and evtx versions split them differently
+      # (Data5 vs one comma-joined Data1), so match the path in any field.
+      '*': '(?<![a-z]:\\windows\\ntds)\\ntds\.dit\b'
+  detail: "{Data1} {Data5}"
+  tests:
+    match:
+      - {event_id: 326, provider: ESENT, Data1: NTDS, Data5: 'C:\$SNAP_201911270054_VOLUMEC$\Windows\NTDS\ntds.dit'}
+      - {event_id: 326, provider: ESENT, Data1: 'NTDS,3392,,1,C:\$SNAP_201911270054_VOLUMEC$\Windows\NTDS\ntds.dit,0,[1'}
+      - {event_id: 325, provider: ESENT, Data5: 'C:\Users\bob\Desktop\ifm\Active Directory\ntds.dit'}
+    no_match:
+      - {event_id: 326, provider: ESENT, Data1: NTDS, Data5: 'C:\Windows\NTDS\ntds.dit'}
+      - {event_id: 326, provider: ESENT, Data1: 'NTDS,3392,,1,C:\Windows\NTDS\ntds.dit,0,[1'}
+
+- id: win-psexec-pipe
+  name: LATERAL_MOVEMENT
+  title: Remote execution tool named pipe (PsExec / RemCom / PAExec)
+  type: event
+  severity: high
+  mitre: [T1569.002, T1021.002]
+  match:
+    event_id: [17, 18]
+    provider: Microsoft-Windows-Sysmon
+    fields:
+      PipeName: '\\(?:psexesvc|remcom_communic|paexec|csexecsvc)'
+  detail: "{PipeName} by {Image}"
+  tests:
+    match: [{event_id: 17, provider: Microsoft-Windows-Sysmon, PipeName: '\PSEXESVC-WS01-1234-stdin', Image: 'C:\Windows\PSEXESVC.exe'}]
+    no_match: [{event_id: 17, provider: Microsoft-Windows-Sysmon, PipeName: '\svchost', Image: 'C:\Windows\svchost.exe'}]
+
+- id: win-portproxy-registry
+  name: SUSPICIOUS_COMMAND
+  title: Port forwarding configured (PortProxy registry)
+  type: event
+  severity: medium
+  mitre: [T1090]
+  match:
+    event_id: [12, 13]
+    provider: Microsoft-Windows-Sysmon
+    fields:
+      TargetObject: '\\services\\portproxy\\v4tov[46]\\'
+  detail: "{TargetObject} -> {Details}"
+  description: Catches netsh portproxy even when the command line is abbreviated or obfuscated.
+  tests:
+    match: [{event_id: 13, provider: Microsoft-Windows-Sysmon, TargetObject: 'HKLM\System\CurrentControlSet\services\PortProxy\v4tov4\tcp\1.2.3.4/8001', Details: 1.2.3.5/3389}]
+    no_match: [{event_id: 13, provider: Microsoft-Windows-Sysmon, TargetObject: 'HKLM\System\CurrentControlSet\services\Tcpip\Parameters'}]

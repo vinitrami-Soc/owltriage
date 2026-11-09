@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 import requests
 
-from triage import enrichment
-from triage.config import Settings
-from triage.pipeline import TriagePipeline, load_alerts
+from bluetriage import enrichment
+from bluetriage.config import Settings
+from bluetriage.pipeline import TriagePipeline, load_alerts
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+DATA = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
 EICAR = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
-MOCK = json.loads((DATA / "mock_intel.json").read_text())
+MOCK = json.loads((Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "mock_intel.json").read_text())
 
 
 class FakeSOC:

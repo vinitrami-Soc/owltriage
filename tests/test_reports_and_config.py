@@ -6,13 +6,13 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from triage.config import load_settings
-from triage.defense import plan_blocks
-from triage.detectors import analyze
-from triage.intel import BadIPList
-from triage.reporting import render_hunt, write_json_report, write_text_report
+from bluetriage.config import load_settings
+from bluetriage.defense import plan_blocks
+from bluetriage.detectors import analyze
+from bluetriage.intel import BadIPList
+from bluetriage.reporting import render_hunt, write_json_report, write_text_report
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+DATA = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +26,7 @@ def test_sample_story_is_fully_detected(sample):
     """Regression guard for the attack story in data/: every planted attack must be found."""
     result, rules, _ = sample
     found = {(f.rule, f.ip) for f in result.findings}
-    assert {("COMPROMISE_SUSPECTED", "203.0.113.5"), ("SSH_BRUTE_FORCE", "198.51.100.23"),
+    assert {("COMPROMISE_SUSPECTED", "203.0.113.5"), ("BRUTE_FORCE", "198.51.100.23"),
             ("BAD_IP_MATCH", "192.0.2.77"), ("PATH_TRAVERSAL", "192.0.2.77"),
             ("SQL_INJECTION", "203.0.113.50"), ("XSS", "203.0.113.88"),
             ("C2_INDICATOR", "203.0.113.99")} <= found
@@ -39,8 +39,8 @@ def test_sample_story_is_fully_detected(sample):
 def test_text_report_counts_match(sample, tmp_path):
     result, rules, skipped = sample
     text = write_text_report(result, rules, skipped, tmp_path / "r.txt").read_text()
-    assert "Attacks / findings detected : 18" in text
-    assert "critical 1, high 13, medium 3, low 1" in text
+    assert "Attacks / findings detected : 21" in text
+    assert "critical 2, high 15, medium 3, low 1" in text
     assert "Malicious IPs               : 5" in text
     assert "iptables -A OUTPUT -d 203.0.113.99 -j DROP" in text
 
@@ -48,7 +48,7 @@ def test_text_report_counts_match(sample, tmp_path):
 def test_json_report_is_machine_readable(sample, tmp_path):
     result, rules, _ = sample
     data = json.loads(write_json_report(result, rules, tmp_path / "r.json").read_text())
-    assert data["stats"]["failed_ssh_logins"] == 15
+    assert data["stats"]["failed_logins"] == 15
     assert {"rule", "severity", "ip", "evidence"} <= set(data["findings"][0])
     assert data["block_rules"][0]["command"].startswith("iptables -A")
 

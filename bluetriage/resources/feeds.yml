@@ -1,0 +1,41 @@
+# Free IP threat feeds used by `bluetriage update-feeds`.
+# Each provider has its own terms of use: read them (homepage) before using a
+# feed commercially. Add your own feeds in a file passed with --feeds-config.
+#
+# Private, reserved and over-broad ranges (wider than /8) are dropped when a
+# feed is loaded, so a broken feed can never flag your own LAN.
+
+- id: ipsum-level3
+  name: IPsum (on 3+ public blocklists)
+  url: https://raw.githubusercontent.com/stamparm/ipsum/master/levels/3.txt
+  homepage: https://github.com/stamparm/ipsum
+  description: Daily aggregate of many public blocklists; level 3 = listed by at least 3 of them.
+  enabled: true
+
+- id: feodo-tracker
+  name: abuse.ch Feodo Tracker
+  url: https://feodotracker.abuse.ch/downloads/ipblocklist.txt
+  homepage: https://feodotracker.abuse.ch/blocklist/
+  description: Botnet command-and-control servers (Dridex, Emotet, QakBot, ...).
+  enabled: true
+
+- id: blocklist-de-ssh
+  name: blocklist.de SSH attackers
+  url: https://lists.blocklist.de/lists/ssh.txt
+  homepage: https://www.blocklist.de/en/export.html
+  description: IPs reported for SSH attacks in the last 48 hours.
+  enabled: true
+
+- id: et-compromised
+  name: Emerging Threats compromised hosts
+  url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+  homepage: https://rules.emergingthreats.net/
+  description: Known compromised or hostile hosts.
+  enabled: true
+
+- id: firehol-level1
+  name: FireHOL level 1
+  url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
+  homepage: https://iplists.firehol.org/
+  description: Broad, conservative aggregate (CIDR ranges). Off by default because it is large.
+  enabled: false

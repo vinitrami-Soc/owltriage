@@ -1,0 +1,46 @@
+# Raw-line rules for Linux text logs (auth.log / secure / syslog).
+
+- id: linux-new-user
+  name: PERSISTENCE
+  title: New local Linux account
+  type: line
+  severity: medium
+  mitre: [T1136.001]
+  pattern: '\buseradd\[\d+\]: new user: name='
+  tests:
+    match: ["Nov  9 03:13:00 web01 useradd[2430]: new user: name=support, UID=1002, GID=1002, home=/home/support, shell=/bin/bash"]
+    no_match: ["Nov  9 03:13:00 web01 useradd[2430]: new group: name=support, GID=1002"]
+
+- id: linux-sudo-group-add
+  name: PRIVILEGE_ESCALATION
+  title: Account added to sudo / wheel group
+  type: line
+  severity: high
+  mitre: [T1098]
+  pattern: '\busermod\[\d+\]: add ''[^'']+'' to (?:shadow )?group ''(?:sudo|wheel|admin)''|\bgpasswd\[\d+\]: user \S+ added by \S+ to group (?:sudo|wheel|admin)\b'
+  tests:
+    match: ["Nov  9 03:13:05 web01 usermod[2433]: add 'support' to group 'sudo'", "Nov  9 03:13:05 web01 gpasswd[2440]: user support added by root to group wheel"]
+    no_match: ["Nov  9 03:13:05 web01 usermod[2433]: add 'support' to group 'docker'"]
+
+- id: linux-sudo-abuse
+  name: PRIVILEGE_ESCALATION
+  title: Failed sudo / user not in sudoers
+  type: line
+  severity: medium
+  mitre: [T1548.003]
+  pattern: '\bsudo(?:\[\d+\])?:\s+\S+ : (?:\d+ incorrect password attempts?|user NOT in sudoers)'
+  tests:
+    match: ["Nov  9 03:30:00 web01 sudo:  www-data : user NOT in sudoers ; TTY=pts/2 ; PWD=/var/www ; USER=root ; COMMAND=/bin/bash", "Nov  9 03:31:00 web01 sudo:   alice : 3 incorrect password attempts ; TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/id"]
+    no_match: ["Nov  9 03:14:22 web01 sudo:    admin : TTY=pts/1 ; PWD=/home/admin ; USER=root ; COMMAND=/usr/bin/apt update"]
+
+- id: linux-root-ssh-login
+  name: RISKY_LOGIN
+  title: Direct root login over SSH
+  type: line
+  severity: low
+  mitre: [T1078.003]
+  pattern: '\bsshd\[\d+\]: Accepted \S+ for root from '
+  false_positives: ["Automation that still logs in as root; consider PermitRootLogin no"]
+  tests:
+    match: ["Nov  9 03:00:00 web01 sshd[100]: Accepted publickey for root from 192.168.1.10 port 5000 ssh2"]
+    no_match: ["Nov  9 03:00:00 web01 sshd[100]: Accepted publickey for rooted from 192.168.1.10 port 5000 ssh2"]

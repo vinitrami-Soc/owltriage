@@ -22,7 +22,7 @@ from .utils import clean
 VT_API = "https://www.virustotal.com/api/v3"
 VT_GUI = "https://www.virustotal.com/gui"
 ABUSEIPDB_API = "https://api.abuseipdb.com/api/v2"
-MOCK_FILE = Path(__file__).resolve().parent.parent / "data" / "mock_intel.json"
+MOCK_FILE = Path(__file__).resolve().parent / "resources" / "mock_intel.json"
 _HASH = re.compile(r"[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64}")
 
 

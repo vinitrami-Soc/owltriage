@@ -1,0 +1,32 @@
+name: Bug report
+description: Something crashed or behaved wrongly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Security vulnerability in bluetriage itself? Please follow SECURITY.md instead of opening a public issue."
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: bluetriage hunt Security.evtx --window 300
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output / traceback (sanitized)
+      render: text
+  - type: input
+    id: env
+    attributes:
+      label: bluetriage version, Python version, OS
+      placeholder: bluetriage 2.0.0, Python 3.12, Ubuntu 24.04
+    validations:
+      required: true

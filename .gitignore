@@ -3,15 +3,21 @@
 .env.*
 !.env.example
 
-# Generated reports and block scripts
+# Generated reports, block scripts, payloads
+bluetriage-output/
 output/
 
 # Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
 .venv/
 venv/
+build/
+dist/
 *.egg-info/
 
 # Editors / OS

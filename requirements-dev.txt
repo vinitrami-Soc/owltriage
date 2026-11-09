@@ -1,5 +1,7 @@
 -r requirements.txt
+evtx>=0.8
 pytest>=7.0
 pytest-cov>=4.0
 hypothesis>=6.0
 ruff>=0.4
+stix2>=3.0

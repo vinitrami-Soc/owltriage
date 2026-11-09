@@ -1,10 +1,10 @@
-from triage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
+from bluetriage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
 
 
 def test_failed_password_for_invalid_user():
     ev = parse_line("Nov  9 03:05:04 web01 sshd[2388]: Failed password for invalid user oracle "
                     "from 198.51.100.23 port 40122 ssh2")
-    assert ev.kind == "ssh_failed"
+    assert ev.kind == "auth_failure"
     assert ev.user == "oracle"
     assert ev.ip == "198.51.100.23"
     assert ev.timestamp == "Nov  9 03:05:04"
@@ -13,13 +13,13 @@ def test_failed_password_for_invalid_user():
 def test_accepted_publickey_with_fingerprint():
     ev = parse_line("Nov  9 03:00:14 web01 sshd[2301]: Accepted publickey for sysadmin from 192.168.1.10 "
                     "port 51022 ssh2: ED25519 SHA256:Su4WsgeKmBGbCkmnb6SDo2pV61hNFvG4R/kXSSR7+f4")
-    assert (ev.kind, ev.user, ev.ip) == ("ssh_accepted", "sysadmin", "192.168.1.10")
+    assert (ev.kind, ev.user, ev.ip) == ("auth_success", "sysadmin", "192.168.1.10")
 
 
 def test_syslog_repeated_message_is_counted():
     ev = parse_line("Nov  9 03:11:55 web01 sshd[2410]: message repeated 3 times: "
                     "[ Failed password for root from 203.0.113.5 port 52314 ssh2]")
-    assert (ev.kind, ev.user, ev.repeat) == ("ssh_failed", "root", 3)
+    assert (ev.kind, ev.user, ev.repeat) == ("auth_failure", "root", 3)
 
 
 def test_crafted_username_cannot_spoof_the_source_ip():

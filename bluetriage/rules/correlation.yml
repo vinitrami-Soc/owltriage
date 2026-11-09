@@ -1,0 +1,76 @@
+# Built-in correlation rules. The stateful logic lives in bluetriage/detectors.py;
+# everything here (severity, ATT&CK, thresholds, windows) can be tuned, or a rule
+# disabled, from your own rules directory. Example override file:
+#
+#   - id: auth-brute-force
+#     threshold: 10
+#     window_seconds: 300
+
+- id: auth-brute-force
+  name: BRUTE_FORCE
+  title: Brute force
+  type: correlation
+  severity: high
+  mitre: [T1110.001]
+  mitre_spraying: [T1110.003]
+  threshold: 5            # failed logins from one IP...
+  window_seconds: 600     # ...within this many seconds (0 = whole file)
+  spraying_min_users: 3   # this many different usernames = password spraying
+  block: inbound
+  description: >
+    Many failed logins from one IP (SSH, RDP, Windows network logons) inside the
+    time window. Three or more distinct usernames is reported as password spraying.
+
+- id: auth-success-after-brute-force
+  name: COMPROMISE_SUSPECTED
+  title: Successful login after brute force
+  type: correlation
+  severity: critical
+  mitre: [T1110, T1078]
+  block: inbound
+  description: >
+    A login succeeded from an IP that had crossed the brute-force threshold inside
+    the window. Treat the account as compromised until proven otherwise.
+
+- id: auth-success-from-bad-ip
+  name: LOGIN_FROM_BAD_IP
+  title: Successful login from blocklisted IP
+  type: correlation
+  severity: critical
+  mitre: [T1078]
+  block: inbound
+  description: A login succeeded from an IP on the local blocklist or a threat feed.
+
+- id: blocklist-match
+  name: BAD_IP_MATCH
+  title: IP on blocklist / threat feed
+  type: correlation
+  severity: high
+  mitre: []
+  block: inbound
+  description: >
+    An IP in the logs is on bad_ips.txt or a downloaded threat feed. If this host
+    connected TO the IP (e.g. Sysmon event 3), the block rule is outbound.
+
+- id: encoded-payload
+  name: BASE64_PAYLOAD
+  title: Base64 data in log
+  title_command: Encoded command (base64)
+  type: correlation
+  severity: low
+  severity_command: high
+  mitre: [T1027]
+  mitre_command: [T1027, T1140]
+  block: inbound
+  description: >
+    Base64 (UTF-8 or the UTF-16LE used by PowerShell -EncodedCommand) that decodes
+    to readable text. Low on its own; high when the decoded text matches a command rule.
+
+- id: hidden-ip-in-payload
+  name: C2_INDICATOR
+  title: IP hidden in encoded payload (possible C2)
+  type: correlation
+  severity: high
+  mitre: [T1071]
+  block: outbound
+  description: An IP address found inside a decoded payload; usually a payload or C2 server.

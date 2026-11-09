@@ -5,11 +5,12 @@ shell stand-in on PATH records rules in a state file instead.
 """
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-from triage.defense import BlockRule, write_script
+from bluetriage.defense import BlockRule, write_script
 
 FAKE_IPTABLES = r"""#!/usr/bin/env bash
 state="${FAKE_IPT_STATE:?}"
@@ -24,7 +25,8 @@ case "$op" in
 esac
 """
 
-pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+pytestmark = pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32",
+                                reason="needs a POSIX shell (iptables only exists on Linux anyway)")
 
 
 @pytest.fixture

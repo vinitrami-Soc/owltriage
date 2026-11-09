@@ -1,0 +1,42 @@
+# MITRE ATT&CK (Enterprise) techniques referenced by bluetriage rules.
+# Every `mitre:` ID in a rule must exist here, which catches typos in pull requests.
+# Adding a rule that needs a new technique? Add it here with its official name
+# from https://attack.mitre.org/techniques/enterprise/
+T1003: {name: OS Credential Dumping, tactics: [credential-access]}
+T1003.001: {name: "OS Credential Dumping: LSASS Memory", tactics: [credential-access]}
+T1021.002: {name: "Remote Services: SMB/Windows Admin Shares", tactics: [lateral-movement]}
+T1021.004: {name: "Remote Services: SSH", tactics: [lateral-movement]}
+T1027: {name: Obfuscated Files or Information, tactics: [defense-evasion]}
+T1053.003: {name: "Scheduled Task/Job: Cron", tactics: [execution, persistence, privilege-escalation]}
+T1053.005: {name: "Scheduled Task/Job: Scheduled Task", tactics: [execution, persistence, privilege-escalation]}
+T1059: {name: Command and Scripting Interpreter, tactics: [execution]}
+T1059.001: {name: "Command and Scripting Interpreter: PowerShell", tactics: [execution]}
+T1059.004: {name: "Command and Scripting Interpreter: Unix Shell", tactics: [execution]}
+T1070.001: {name: "Indicator Removal: Clear Windows Event Logs", tactics: [defense-evasion]}
+T1070.003: {name: "Indicator Removal: Clear Command History", tactics: [defense-evasion]}
+T1071: {name: Application Layer Protocol, tactics: [command-and-control]}
+T1078: {name: Valid Accounts, tactics: [defense-evasion, persistence, privilege-escalation, initial-access]}
+T1078.003: {name: "Valid Accounts: Local Accounts", tactics: [defense-evasion, persistence, privilege-escalation, initial-access]}
+T1098: {name: Account Manipulation, tactics: [persistence, privilege-escalation]}
+T1098.004: {name: "Account Manipulation: SSH Authorized Keys", tactics: [persistence, privilege-escalation]}
+T1105: {name: Ingress Tool Transfer, tactics: [command-and-control]}
+T1110: {name: Brute Force, tactics: [credential-access]}
+T1110.001: {name: "Brute Force: Password Guessing", tactics: [credential-access]}
+T1110.003: {name: "Brute Force: Password Spraying", tactics: [credential-access]}
+T1136.001: {name: "Create Account: Local Account", tactics: [persistence]}
+T1140: {name: Deobfuscate/Decode Files or Information, tactics: [defense-evasion]}
+T1190: {name: Exploit Public-Facing Application, tactics: [initial-access]}
+T1222.002: {name: "File and Directory Permissions Modification: Linux and Mac File and Directory Permissions Modification", tactics: [defense-evasion]}
+T1490: {name: Inhibit System Recovery, tactics: [impact]}
+T1543.003: {name: "Create or Modify System Process: Windows Service", tactics: [persistence, privilege-escalation]}
+T1548.003: {name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching", tactics: [privilege-escalation, defense-evasion]}
+T1558.003: {name: "Steal or Forge Kerberos Tickets: Kerberoasting", tactics: [credential-access]}
+T1562.001: {name: "Impair Defenses: Disable or Modify Tools", tactics: [defense-evasion]}
+T1562.002: {name: "Impair Defenses: Disable Windows Event Logging", tactics: [defense-evasion]}
+T1569.002: {name: "System Services: Service Execution", tactics: [execution]}
+T1595.002: {name: "Active Scanning: Vulnerability Scanning", tactics: [reconnaissance]}
+T1595.003: {name: "Active Scanning: Wordlist Scanning", tactics: [reconnaissance]}
+T1003.003: {name: "OS Credential Dumping: NTDS", tactics: [credential-access]}
+T1003.006: {name: "OS Credential Dumping: DCSync", tactics: [credential-access]}
+T1090: {name: Proxy, tactics: [command-and-control]}
+T1220: {name: XSL Script Processing, tactics: [defense-evasion]}

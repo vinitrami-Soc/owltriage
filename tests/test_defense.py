@@ -1,7 +1,7 @@
 import pytest
 
-from triage.defense import BlockRule, parse_allowlist, plan_blocks, render_script
-from triage.detectors import Finding
+from bluetriage.defense import BlockRule, parse_allowlist, plan_blocks, render_script
+from bluetriage.detectors import Finding
 
 
 def finding(ip, severity="high", block="inbound", rule="BAD_IP_MATCH"):
@@ -19,10 +19,10 @@ def test_commands_for_ipv4_ipv6_and_outbound():
 
 
 def test_duplicate_findings_become_one_rule_with_all_reasons():
-    rules, _ = plan_blocks([finding("203.0.113.5", rule="SSH_BRUTE_FORCE"),
+    rules, _ = plan_blocks([finding("203.0.113.5", rule="BRUTE_FORCE"),
                             finding("203.0.113.5", rule="COMPROMISE_SUSPECTED")])
     assert len(rules) == 1
-    assert rules[0].reasons == ["SSH_BRUTE_FORCE", "COMPROMISE_SUSPECTED"]
+    assert rules[0].reasons == ["BRUTE_FORCE", "COMPROMISE_SUSPECTED"]
 
 
 def test_allowlist_loopback_and_low_severity_are_never_blocked():
@@ -44,7 +44,7 @@ def test_bad_allowlist_entry_raises():
 
 
 def test_script_is_idempotent_and_has_undo():
-    script = render_script([BlockRule("203.0.113.5", "inbound", ["SSH_BRUTE_FORCE"])])
+    script = render_script([BlockRule("203.0.113.5", "inbound", ["BRUTE_FORCE"])])
     assert "iptables -C INPUT -s 203.0.113.5 -j DROP 2>/dev/null || iptables -A INPUT -s 203.0.113.5 -j DROP" in script
     assert "# iptables -D INPUT -s 203.0.113.5 -j DROP" in script
 

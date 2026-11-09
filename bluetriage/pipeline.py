@@ -13,6 +13,7 @@ import ipaddress
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
@@ -339,6 +340,19 @@ class TriagePipeline:
                 failed += 1
         detail = f"case #{number} ({case_id}), {len(observables) - failed}/{len(observables)} observables added"
         report.actions.append(("TheHive case", "created", detail))
+
+
+def report_summary(report: TriageReport) -> dict:
+    """One JSON line per triaged alert (alert_results.ndjson): an audit trail a SIEM can ingest back."""
+    return {
+        "triaged_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "alert_id": report.alert_id, "rule_id": report.rule_id, "agent": report.agent_name,
+        "severity": report.severity, "escalated": report.flagged, "mitre": report.mitre, "mock": report.mock,
+        "indicators": [{"provider": r.provider, "kind": r.kind, "value": r.indicator, "verdict": r.verdict,
+                        "score": r.score, "out_of": r.out_of, "error": r.error} for r in report.results],
+        "actions": [{"action": a, "status": s, "detail": d} for a, s, d in report.actions],
+        "recommendations": report.recommendations,
+    }
 
 
 def _describe(exc: requests.RequestException) -> str:

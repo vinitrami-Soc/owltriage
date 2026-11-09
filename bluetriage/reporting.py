@@ -1,4 +1,4 @@
-"""Phase 3: output and reporting (colored terminal output + report files).
+"""Human-readable output: colored terminal report and text/JSON report files.
 
 Every value that came from a log or an alert is wrapped in `Text(clean(...))`
 before printing, never passed as a markup string, so a log line containing
@@ -21,6 +21,7 @@ from rich.text import Text
 from . import __version__
 from .defense import BlockRule
 from .detectors import AnalysisResult
+from .rules import RuleSet
 from .utils import SEVERITIES, SEVERITY_STYLE, clean, rel
 
 VERDICT_STYLE = {
@@ -29,10 +30,11 @@ VERDICT_STYLE = {
 }
 ACTION_STYLE = {"sent": "bold green", "created": "bold green", "dry-run": "bold cyan",
                 "skipped": "dim", "not needed": "green", "failed": "bold red"}
+SOURCE_LABEL = {"text": "Linux/syslog", "web": "web access", "windows": "Windows"}
 
 
-def make_console(record: bool = False, width: Optional[int] = None) -> Console:
-    return Console(record=record, width=width, highlight=False)
+def make_console(record: bool = False, width: Optional[int] = None, quiet: bool = False) -> Console:
+    return Console(record=record, width=width, highlight=False, quiet=quiet)
 
 
 def _severity_badge(severity: str) -> Text:
@@ -45,35 +47,46 @@ def _stat(label: str, value, style: str = "bold") -> Text:
 
 def _banner(subtitle: str, mock: bool = False) -> Text:
     text = Text()
-    text.append("BLUE TEAM AUTO-TRIAGE", style="bold cyan")
+    text.append("BLUETRIAGE", style="bold cyan")
     text.append(f"  ·  {subtitle}", style="cyan")
     if mock:
         text.append("   MOCK DATA", style="bold magenta")
     return text
 
 
+def _sources(result: AnalysisResult) -> str:
+    return ", ".join(f"{SOURCE_LABEL.get(kind, kind)} {count}" for kind, count in result.log_types.most_common())
+
+
 # ---------------------------------------------------------------------------
-# Option 1: offline hunt
+# hunt
 # ---------------------------------------------------------------------------
 def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockRule],
-                skipped: Sequence[Tuple[str, str]], outputs: Dict[str, Path]) -> None:
+                skipped: Sequence[Tuple[str, str]], outputs: Dict[str, Path],
+                ruleset: Optional[RuleSet] = None, feed_note: str = "") -> None:
     counts = result.severity_counts()
     verdicts = result.ip_verdicts()
     malicious = sum(v["verdict"] == "MALICIOUS" for v in verdicts)
+    techniques = result.technique_counts()
 
-    header = _banner("Option 1: offline log hunt")
+    header = _banner("log hunt")
     header.append("\nScanned: ", style="dim")
-    header.append(", ".join(clean(rel(f), 60) for f in result.files))
+    header.append(", ".join(clean(Path(f).name, 50) for f in result.files))
+    header.append("\nEvents:  ", style="dim")
+    header.append(_sources(result) or "none")
+    header.append(f"   Rules: {result.rules_loaded}   Blocklist: {result.blocklist_size:,} entries", style="dim")
+    if feed_note:
+        header.append(f"\n{feed_note}", style="yellow" if "stale" in feed_note or "no feeds" in feed_note else "dim")
     console.print(Panel(header, box=box.HEAVY, border_style="cyan"))
 
     stats = Table.grid(expand=True, padding=(0, 1))
     for _ in range(5):
         stats.add_column(justify="center")
     stats.add_row(
-        _stat("lines scanned", result.lines_scanned),
+        _stat("events scanned", f"{result.lines_scanned:,}"),
         _stat("unique IPs", len(verdicts)),
-        _stat("failed SSH logins", sum(result.failed_by_ip.values()), "bold yellow"),
         _stat("findings", len(result.findings), "bold yellow" if result.findings else "bold green"),
+        _stat("ATT&CK techniques", len(techniques), "bold magenta" if techniques else "bold green"),
         _stat("malicious IPs", malicious, "bold red" if malicious else "bold green"),
     )
     chips = Text(justify="center")
@@ -86,6 +99,7 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
         table = Table(title="Findings", title_style="bold", box=box.SIMPLE_HEAVY, expand=True)
         table.add_column("Severity", no_wrap=True)
         table.add_column("Rule", no_wrap=True, style="bold")
+        table.add_column("ATT&CK", no_wrap=True, style="magenta")
         table.add_column("IP", no_wrap=True)
         table.add_column("What happened", ratio=1)
         table.add_column("Where", no_wrap=True, style="dim")
@@ -95,30 +109,35 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
                 what.append(f"  ×{f.count}", style="bold magenta")
             what.append(f"\n{clean(f.detail, 120)}", style="dim")
             ip_style = "red" if f.severity in ("high", "critical") else ""
-            table.add_row(_severity_badge(f.severity), Text(f.rule), Text(f.ip or "-", style=ip_style),
-                          what, Text(f.location))
+            table.add_row(_severity_badge(f.severity), Text(f.rule), Text("\n".join(f.mitre) or "-"),
+                          Text(f.ip or "-", style=ip_style), what, Text(clean(f.location, 40)))
         console.print(table)
     else:
         console.print(Panel(Text("No threats found in these logs.", style="bold green"), border_style="green"))
 
-    ip_table = Table(title="IP verdicts", title_style="bold", box=box.SIMPLE_HEAVY, expand=True)
-    for name, justify in (("IP", "left"), ("Lines", "right"), ("Failed", "right"),
-                          ("Logins", "right"), ("Verdict", "left"), ("Why", "left")):
-        ip_table.add_column(name, justify=justify, no_wrap=name != "Why", ratio=1 if name == "Why" else None)
-    for row in verdicts[:25]:
-        style = VERDICT_STYLE[row["verdict"]]
-        ip_table.add_row(Text(row["ip"], style=style), str(row["lines"]), str(row["failed_logins"]),
-                         str(row["accepted_logins"]), Text(row["verdict"], style=style),
-                         Text(", ".join(row["reasons"]) or "-", style="dim"))
-    console.print(ip_table)
-    if len(verdicts) > 25:
-        console.print(Text(f"  … {len(verdicts) - 25} more IPs in the report files", style="dim"))
+    if verdicts:
+        ip_table = Table(title="IP verdicts", title_style="bold", box=box.SIMPLE_HEAVY, expand=True)
+        for name, justify in (("IP", "left"), ("Events", "right"), ("Failed", "right"),
+                              ("Logins", "right"), ("Verdict", "left"), ("Why", "left")):
+            ip_table.add_column(name, justify=justify, no_wrap=name != "Why", ratio=1 if name == "Why" else None)
+        for row in verdicts[:25]:
+            style = VERDICT_STYLE[row["verdict"]]
+            ip_table.add_row(Text(row["ip"], style=style), str(row["lines"]), str(row["failed_logins"]),
+                             str(row["accepted_logins"]), Text(row["verdict"], style=style),
+                             Text(", ".join(row["reasons"]) or "-", style="dim"))
+        console.print(ip_table)
+        if len(verdicts) > 25:
+            console.print(Text(f"  … {len(verdicts) - 25} more IPs in the report files", style="dim"))
 
+    if techniques and ruleset is not None:
+        attack = Text("ATT&CK: ", style="bold magenta")
+        attack.append(", ".join(f"{t} {ruleset.technique_name(t)}" for t in sorted(techniques)), style="magenta")
+        console.print(attack)
     if result.failed_usernames:
         users = Text("Most targeted usernames: ", style="bold")
         users.append(", ".join(f"{clean(u, 24)} ({n})" for u, n in result.failed_usernames.most_common(8)))
         console.print(users)
-        console.print()
+    console.print()
 
     if rules:
         body = Text()
@@ -133,34 +152,40 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
                         style="dim")
         console.print(Panel(body, title="Active defense (generated, NOT executed)", border_style="red"))
 
-    files = Text("Reports: ", style="bold")
-    files.append("  ·  ".join(rel(p) for p in outputs.values()))
+    for warning in result.warnings:
+        console.print(Text(f"warning: {clean(warning, 200)}", style="yellow"))
+    files = Text("Outputs: ", style="bold")
+    files.append("  ".join(Path(p).name for p in outputs.values()), style="dim")
+    if outputs:
+        files.append(f"  (in {rel(Path(next(iter(outputs.values()))).parent)})", style="dim")
     console.print(files)
 
 
 def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
-                      skipped: Sequence[Tuple[str, str]], path) -> Path:
+                      skipped: Sequence[Tuple[str, str]], path, ruleset: Optional[RuleSet] = None) -> Path:
     path = Path(path)
     counts = result.severity_counts()
     verdicts = result.ip_verdicts()
+    techniques = result.technique_counts()
     bar, rule_line = "=" * 78, "-" * 78
     lines: List[str] = [
         bar,
-        " BLUE TEAM AUTO-TRIAGE: OFFLINE HUNT REPORT",
+        " BLUETRIAGE HUNT REPORT",
         bar,
-        f"Generated     : {datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S UTC}",
+        f"Generated     : {datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S UTC} (bluetriage {__version__})",
         f"Files         : {', '.join(clean(rel(f), 80) for f in result.files)}",
-        f"Lines scanned : {result.lines_scanned}",
+        f"Events        : {result.lines_scanned} ({_sources(result)})",
         f"Unique IPs    : {len(verdicts)}",
-        f"Blocklist     : {result.blocklist_size} entries",
+        f"Rules / intel : {result.rules_loaded} rules, {result.blocklist_size} blocklist/feed entries",
         "",
         "SUMMARY",
         rule_line,
         f"  Attacks / findings detected : {len(result.findings)}",
         "  By severity                 : " + ", ".join(f"{s} {counts.get(s, 0)}" for s in reversed(SEVERITIES[1:])),
         f"  Malicious IPs               : {sum(v['verdict'] == 'MALICIOUS' for v in verdicts)}",
-        f"  Failed SSH logins           : {sum(result.failed_by_ip.values())}",
-        f"  Successful SSH logins       : {sum(result.accepted_by_ip.values())}",
+        f"  ATT&CK techniques           : {len(techniques)}",
+        f"  Failed logins               : {sum(result.failed_by_ip.values())}",
+        f"  Successful remote logins    : {sum(result.accepted_by_ip.values())}",
         "",
         "FINDINGS",
         rule_line,
@@ -169,12 +194,19 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
         lines.append("  None.")
     for f in result.findings:
         times = f" (x{f.count})" if f.count > 1 else ""
-        lines.append(f"[{f.severity.upper():<8}] {f.rule:<21} {f.ip or '-':<16} {f.location}")
+        lines.append(f"[{f.severity.upper():<8}] {f.rule:<21} {f.ip or '-':<16} {clean(f.location, 40)}")
         lines.append(f"           {f.title}: {clean(f.detail, 200)}{times}")
+        if f.mitre:
+            lines.append(f"           ATT&CK: {', '.join(f.mitre)}   rule: {f.rule_id}")
+    if techniques:
+        lines += ["", "ATT&CK COVERAGE", rule_line]
+        for technique, count in sorted(techniques.items()):
+            name = ruleset.technique_name(technique) if ruleset else ""
+            lines.append(f"  {technique:<11} {count:>4}  {name}")
     lines += ["", "IP VERDICTS", rule_line,
-              f"  {'IP':<18}{'Lines':>6}{'Failed':>8}{'Logins':>8}  {'Verdict':<11} Why"]
+              f"  {'IP':<18}{'Events':>7}{'Failed':>8}{'Logins':>8}  {'Verdict':<11} Why"]
     for row in verdicts:
-        lines.append(f"  {row['ip']:<18}{row['lines']:>6}{row['failed_logins']:>8}{row['accepted_logins']:>8}"
+        lines.append(f"  {row['ip']:<18}{row['lines']:>7}{row['failed_logins']:>8}{row['accepted_logins']:>8}"
                      f"  {row['verdict']:<11} {', '.join(row['reasons']) or '-'}")
     if result.failed_usernames:
         lines += ["", "MOST TARGETED USERNAMES", rule_line]
@@ -182,6 +214,8 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
     lines += ["", "ACTIVE DEFENSE (review before running; nothing was executed)", rule_line]
     lines += [f"  {r.command():<48} # {', '.join(r.reasons)}" for r in rules] or ["  Nothing to block."]
     lines += [f"  not blocked: {ip} ({why})" for ip, why in skipped]
+    if result.warnings:
+        lines += ["", "WARNINGS", rule_line] + [f"  {clean(w, 200)}" for w in result.warnings]
     lines += [bar, ""]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -191,20 +225,23 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
 def write_json_report(result: AnalysisResult, rules: Sequence[BlockRule], path) -> Path:
     path = Path(path)
     data = {
-        "tool": "blue-team-auto-triage",
+        "tool": "bluetriage",
         "version": __version__,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "files": result.files,
         "stats": {
-            "lines_scanned": result.lines_scanned,
+            "events_scanned": result.lines_scanned,
             "events_by_kind": dict(result.events_by_kind),
-            "failed_ssh_logins": sum(result.failed_by_ip.values()),
+            "log_types": dict(result.log_types),
+            "failed_logins": sum(result.failed_by_ip.values()),
             "findings_by_severity": dict(result.severity_counts()),
+            "attack_techniques": dict(result.technique_counts()),
         },
         "findings": [asdict(f) for f in result.findings],
         "ip_verdicts": result.ip_verdicts(),
         "block_rules": [{"ip": r.ip, "direction": r.direction, "reasons": r.reasons, "command": r.command()}
                         for r in rules],
+        "warnings": result.warnings,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -212,14 +249,14 @@ def write_json_report(result: AnalysisResult, rules: Sequence[BlockRule], path) 
 
 
 # ---------------------------------------------------------------------------
-# Option 2: alert pipeline
+# alert pipeline
 # ---------------------------------------------------------------------------
 def _short(indicator: str) -> str:
     return indicator if len(indicator) <= 22 else f"{indicator[:14]}…{indicator[-6:]}"
 
 
 def render_alert(console: Console, report) -> None:
-    head = _banner("Option 2: API-driven alert pipeline", report.mock)
+    head = _banner("alert enrichment", report.mock)
     for label, value in (("\nAlert ", report.alert_id), ("   Rule ", f"{report.rule_id} (level {report.rule_level})"),
                          ("   Time ", report.timestamp)):
         head.append(label, style="dim")
@@ -231,6 +268,9 @@ def render_alert(console: Console, report) -> None:
     if report.username:
         head.append("   User ", style="dim")
         head.append(report.username)
+    if report.mitre:
+        head.append("   ATT&CK ", style="dim")
+        head.append(", ".join(report.mitre), style="magenta")
     if report.file_path:
         head.append("\nFile  ", style="dim")
         head.append(report.file_path)

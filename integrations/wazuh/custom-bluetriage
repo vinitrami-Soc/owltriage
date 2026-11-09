@@ -1,0 +1,17 @@
+#!/bin/sh
+# Wazuh custom integration: enrich alerts with bluetriage.
+# Install as /var/ossec/integrations/custom-bluetriage (see docs/WAZUH.md).
+#
+# wazuh-integratord calls:  custom-bluetriage <alert_file> [api_key] [hook_url]
+# Keys and webhooks come from the bluetriage .env file below, not from ossec.conf.
+
+BLUETRIAGE_BIN="/opt/bluetriage/venv/bin/bluetriage"   # where you installed bluetriage
+BLUETRIAGE_ENV="/opt/bluetriage/.env"                  # VT_API_KEY, DISCORD_WEBHOOK_URL, ...
+OUT_DIR="/var/ossec/logs/bluetriage"                   # audit log + payloads (writable by wazuh)
+
+ALERT_FILE="$1"
+if [ ! -r "$ALERT_FILE" ]; then
+    echo "custom-bluetriage: cannot read alert file '$ALERT_FILE'" >&2
+    exit 1
+fi
+exec "$BLUETRIAGE_BIN" alert "$ALERT_FILE" --env-file "$BLUETRIAGE_ENV" --out-dir "$OUT_DIR" --quiet

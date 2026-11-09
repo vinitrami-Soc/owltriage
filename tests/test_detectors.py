@@ -2,9 +2,9 @@ import base64
 
 import pytest
 
-from triage.detectors import Analyzer, decode_base64_blobs
-from triage.intel import BadIPList
-from triage.log_parser import parse_line
+from bluetriage.detectors import Analyzer, decode_base64_blobs
+from bluetriage.intel import BadIPList
+from bluetriage.log_parser import parse_line
 
 FAILED = "Nov  9 03:11:{s:02d} web01 sshd[1]: Failed password for {user} from {ip} port 5{s:04d} ssh2"
 ACCEPTED = "Nov  9 03:12:00 web01 sshd[2]: Accepted password for {user} from {ip} port 50000 ssh2"
@@ -29,7 +29,7 @@ def failures(ip, n, users=("root",)):
 
 def test_brute_force_needs_threshold():
     assert rules(run(failures("203.0.113.5", 4))) == set()
-    assert ("SSH_BRUTE_FORCE", "203.0.113.5") in rules(run(failures("203.0.113.5", 5)))
+    assert ("BRUTE_FORCE", "203.0.113.5") in rules(run(failures("203.0.113.5", 5)))
 
 
 def test_password_spraying_is_named():

@@ -1,0 +1,35 @@
+name: False positive
+description: A rule fired on something benign
+labels: ["false-positive", "rules"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! False-positive reports are how rules get better.
+        **Remove anything sensitive** (real usernames, hostnames, internal IPs, tokens) from the log lines below.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      description: From the report (`rule:` line) or `bluetriage rules list`
+      placeholder: web-sqli-tautology
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized log line(s) that triggered it
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is this benign?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: bluetriage version
+      placeholder: "bluetriage --version"

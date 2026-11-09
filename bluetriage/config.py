@@ -52,11 +52,11 @@ class Settings:
 
 
 def load_settings(env_file: Optional[Path] = None) -> Settings:
-    """Read `.env` (project root by default) and the process environment.
+    """Read `.env` (current directory by default) and the process environment.
 
     Variables already set in the environment win over the `.env` file.
     """
-    load_dotenv(env_file or PROJECT_ROOT / ".env")
+    load_dotenv(env_file or Path.cwd() / ".env")
     return Settings(
         vt_api_key=_str("VT_API_KEY"),
         abuseipdb_api_key=_str("ABUSEIPDB_API_KEY"),
