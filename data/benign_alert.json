@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-11-09T09:02:11.104+0000",
+  "rule": {
+    "level": 7,
+    "description": "Integrity checksum changed.",
+    "id": "550",
+    "groups": ["ossec", "syscheck", "syscheck_entry_modified"]
+  },
+  "agent": { "id": "003", "name": "web01", "ip": "10.0.2.15" },
+  "manager": { "name": "wazuh-manager" },
+  "id": "1762678931.5520011",
+  "full_log": "File '/etc/motd' modified\nMode: realtime\n",
+  "decoder": { "name": "syscheck_integrity_changed" },
+  "data": { "srcip": "192.0.2.10", "srcuser": "sysadmin" },
+  "syscheck": {
+    "path": "/etc/motd",
+    "mode": "realtime",
+    "uname_after": "root",
+    "sha256_after": "bf28285fca31bb7c28fa131a52061a55ac56307ba0e4b75a35007f89477fd8d6",
+    "event": "modified"
+  },
+  "location": "syscheck"
+}

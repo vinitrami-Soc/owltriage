@@ -1,0 +1,92 @@
+{
+  "_comment": "FAKE API responses used by `--mock`. They follow the real VirusTotal v3 and AbuseIPDB v2 JSON layout so the same parsing code runs with or without API keys. Indicators that are not listed here behave like 'not found'.",
+  "virustotal": {
+    "ip": {
+      "203.0.113.5": {
+        "data": {
+          "id": "203.0.113.5",
+          "type": "ip_address",
+          "attributes": {
+            "country": "NL",
+            "as_owner": "Example Bulletproof Hosting (MOCK)",
+            "reputation": -42,
+            "last_analysis_stats": {
+              "malicious": 14,
+              "suspicious": 3,
+              "harmless": 52,
+              "undetected": 25,
+              "timeout": 0
+            }
+          }
+        }
+      },
+      "192.0.2.10": {
+        "data": {
+          "id": "192.0.2.10",
+          "type": "ip_address",
+          "attributes": {
+            "country": "IN",
+            "as_owner": "Example Corp VPN Gateway (MOCK)",
+            "reputation": 0,
+            "last_analysis_stats": {
+              "malicious": 0,
+              "suspicious": 0,
+              "harmless": 70,
+              "undetected": 24,
+              "timeout": 0
+            }
+          }
+        }
+      }
+    },
+    "hash": {
+      "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f": {
+        "data": {
+          "id": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+          "type": "file",
+          "attributes": {
+            "meaningful_name": "eicar.com",
+            "type_description": "Text",
+            "popular_threat_classification": {
+              "suggested_threat_label": "virus.eicar/test"
+            },
+            "last_analysis_stats": {
+              "malicious": 64,
+              "suspicious": 0,
+              "harmless": 0,
+              "undetected": 8,
+              "type-unsupported": 4,
+              "timeout": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "abuseipdb": {
+    "203.0.113.5": {
+      "data": {
+        "ipAddress": "203.0.113.5",
+        "isPublic": true,
+        "abuseConfidenceScore": 100,
+        "countryCode": "NL",
+        "usageType": "Data Center/Web Hosting/Transit",
+        "isp": "Example Bulletproof Hosting (MOCK)",
+        "totalReports": 1337,
+        "lastReportedAt": "2026-11-09T02:40:00+00:00"
+      }
+    },
+    "192.0.2.10": {
+      "data": {
+        "ipAddress": "192.0.2.10",
+        "isPublic": true,
+        "abuseConfidenceScore": 0,
+        "countryCode": "IN",
+        "usageType": "Commercial",
+        "isp": "Example Corp VPN Gateway (MOCK)",
+        "totalReports": 0,
+        "lastReportedAt": null
+      }
+    }
+  }
+}

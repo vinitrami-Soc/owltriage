@@ -1,0 +1,18 @@
+# Local threat-intel blocklist (Option 1, Phase 2).
+# One IP or CIDR range per line; anything after '#' is a label shown in reports.
+#
+# The sample entries use the RFC 5737 / RFC 3849 documentation ranges
+# (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real
+# host is accused. Replace them with a real feed for production use.
+192.0.2.13          # RDP brute forcer
+192.0.2.77          # Path-traversal scanner seen across honeypots
+192.0.2.101         # Tor exit node
+192.0.2.250         # Cobalt Strike team server
+198.51.100.16/28    # Credential-stuffing botnet range
+198.51.100.66       # Mirai-like IoT bot
+198.51.100.144      # Open proxy abused for spam
+203.0.113.50        # SQL injection campaign source (sqlmap)
+203.0.113.99        # Malware payload / C2 host
+203.0.113.120       # Phishing kit host
+203.0.113.200       # Crypto-miner pool proxy
+2001:db8:bad::/48   # IPv6 scanner range
