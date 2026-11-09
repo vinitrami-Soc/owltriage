@@ -2,7 +2,7 @@
 
 > **A 3AM-approved SOC automation pipeline.** Hunt through raw logs offline, or take a Wazuh alert, enrich it with VirusTotal + AbuseIPDB, ping the team on Discord/Slack and open a TheHive case, in one command.
 
-![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Tests](https://img.shields.io/badge/tests-51%20passing-brightgreen) ![Mode](https://img.shields.io/badge/demo-no%20API%20keys%20needed-purple)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Tests](https://img.shields.io/badge/tests-122%20passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen) ![Mode](https://img.shields.io/badge/demo-no%20API%20keys%20needed-purple)
 
 The tool has two modes:
 
@@ -67,11 +67,11 @@ python main.py hunt
 python main.py alert --mock --dry-run
 ```
 
-Run the tests:
+Run the tests (unit, HTTP integration, E2E, fuzzing, ReDoS and performance; see [docs/TEST_PLAN.md](docs/TEST_PLAN.md)):
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest
+python -m pytest --cov=triage
 ```
 
 ---
@@ -210,8 +210,8 @@ Blue-Team-Triage-Tool/
 │   ├── dummy_alert.json            # mock Wazuh alert: attacker IP + EICAR hash
 │   ├── benign_alert.json           # mock alert that should NOT escalate
 │   └── mock_intel.json             # fake VT/AbuseIPDB responses for --mock
-├── tests/                  # 51 pytest tests
-├── docs/                   # screenshots
+├── tests/                  # 122 tests: unit, integration, E2E, fuzzing, ReDoS, performance
+├── docs/                   # screenshots + TEST_PLAN.md
 ├── .env.example
 └── requirements.txt
 ```

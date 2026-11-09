@@ -47,3 +47,8 @@ def test_script_is_idempotent_and_has_undo():
     script = render_script([BlockRule("203.0.113.5", "inbound", ["SSH_BRUTE_FORCE"])])
     assert "iptables -C INPUT -s 203.0.113.5 -j DROP 2>/dev/null || iptables -A INPUT -s 203.0.113.5 -j DROP" in script
     assert "# iptables -D INPUT -s 203.0.113.5 -j DROP" in script
+
+
+def test_equivalent_ip_spellings_become_one_canonical_rule():
+    rules, _ = plan_blocks([finding("2001:DB8::BAD"), finding("2001:db8:0:0:0:0:0:bad")])
+    assert [r.command() for r in rules] == ["ip6tables -A INPUT -s 2001:db8::bad -j DROP"]

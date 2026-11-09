@@ -18,7 +18,7 @@ SEVERITY_STYLE = {
 
 # C0/C1 control characters (ANSI escapes, newlines, ...) plus the Unicode
 # bidi/zero-width characters used in "Trojan Source"-style display tricks.
-_UNSAFE_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩]")
+_UNSAFE_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 
 
 def clean(text: object, max_len: int = 160) -> str:

@@ -100,8 +100,8 @@ def extract_observables(alert: dict) -> Tuple[List[Observable], List[Tuple[str, 
 
     def add_hashes(raw: Any, source: str) -> bool:
         added = False
-        for value in HASH_RE.findall(str(raw)):
-            value = value.lower()
+        for match in HASH_RE.findall(str(raw)):
+            value = match.lower()
             if value not in seen:
                 seen.add(value)
                 found.append(Observable("hash", value, source))
@@ -163,6 +163,10 @@ class TriageReport:
             level = 0
         username = next((text(p) for p in USER_FIELDS if _dig(alert, p)), None)
         mitre = _dig(alert, "rule.mitre.id") or []
+        if isinstance(mitre, str):  # some decoders send a single ID instead of a list
+            mitre = [mitre]
+        elif not isinstance(mitre, list):
+            mitre = []
         return cls(
             alert_id=text("id", "unknown", 80),
             timestamp=text("timestamp"),

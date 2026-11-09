@@ -11,6 +11,8 @@ import json
 import sys
 from pathlib import Path
 
+from rich.text import Text
+
 from triage import __version__
 from triage.config import PROJECT_ROOT, load_settings
 from triage.defense import parse_allowlist, plan_blocks, write_script
@@ -19,7 +21,7 @@ from triage.intel import BadIPList
 from triage.pipeline import TriagePipeline, load_alerts
 from triage.reporting import (make_console, render_alert, render_hunt, write_json_report,
                               write_text_report)
-from triage.utils import SEVERITIES, SEVERITY_RANK
+from triage.utils import SEVERITIES, SEVERITY_RANK, clean
 
 DATA = PROJECT_ROOT / "data"
 SVG_WIDTH = 120
@@ -90,7 +92,8 @@ def cmd_hunt(args, console) -> int:
 
     render_hunt(console, result, rules, skipped, outputs)
     for line_no, entry in bad_ips.invalid:
-        console.print(f"[yellow]Ignored invalid blocklist entry on line {line_no}[/]", markup=True)
+        console.print(Text(f"Ignored invalid blocklist entry on line {line_no}: {clean(entry, 60)}",
+                           style="yellow"))
 
     if args.fail_on and any(SEVERITY_RANK[f.severity] >= SEVERITY_RANK[args.fail_on] for f in result.findings):
         return 1

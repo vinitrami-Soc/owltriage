@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 
 from triage.detectors import Analyzer, decode_base64_blobs
@@ -109,3 +111,9 @@ def test_harmless_base64_is_low_severity():
     result = run([WEB.format(ip="198.51.100.200", path="/account?s=eyJ1c2VyIjoiZGVtbyIsInJvbGUiOiJ1c2VyIn0",
                              ua=BROWSER)])
     assert [(f.rule, f.severity) for f in result.findings] == [("BASE64_PAYLOAD", "low")]
+
+
+def test_base64_of_control_bytes_is_ignored():
+    """Valid UTF-8 but unreadable (e.g. a binary protocol blob) must not be reported as a payload."""
+    blob = base64.b64encode(bytes(range(1, 32)) * 2).decode()
+    assert decode_base64_blobs(f"data={blob}") == []

@@ -14,6 +14,7 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator, List, Optional
 from urllib.parse import unquote
@@ -67,6 +68,7 @@ class LogEvent:
     ips: List[str] = field(default_factory=list)  # every valid IP on the line
 
 
+@lru_cache(maxsize=65536)  # logs repeat the same few IPs; parsing them was the #1 hotspot
 def normalize_ip(value: Optional[str]) -> Optional[str]:
     """Return a canonical IP string, or None if `value` is not an IP address."""
     if not value:

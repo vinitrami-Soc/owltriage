@@ -25,7 +25,7 @@ def _int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError:
-        raise SystemExit(f"Config error: {name} must be a whole number (got {raw!r})")
+        raise SystemExit(f"Config error: {name} must be a whole number (got {raw!r})") from None
 
 
 def _bool(name: str, default: bool) -> bool:

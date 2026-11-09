@@ -98,5 +98,5 @@ def write_script(rules: Sequence[BlockRule], path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_script(rules), encoding="utf-8")
-    os.chmod(path, 0o750)
+    os.chmod(path, 0o700)  # owner-only: it is run with sudo by whoever generated it
     return path

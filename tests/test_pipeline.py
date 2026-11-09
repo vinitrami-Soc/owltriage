@@ -148,3 +148,11 @@ def test_ndjson_alert_file(tmp_path):
 
 def test_settings_repr_hides_secrets():
     assert "topsecret" not in repr(Settings(vt_api_key="topsecret", discord_webhook_url="topsecret"))
+
+
+@pytest.mark.parametrize("malicious, flagged", [(5, False), (6, True)])
+def test_virustotal_threshold_boundary(malicious, flagged):
+    """Roadmap rule is 'VT score > 5': exactly 5 must NOT escalate."""
+    body = {"data": {"attributes": {"last_analysis_stats": {"malicious": malicious, "harmless": 60}}}}
+    result = VirusTotalClient("key", 5, session=FakeSession(200, body), requests_per_minute=0).lookup("ip", "203.0.113.5")
+    assert result.flagged is flagged
