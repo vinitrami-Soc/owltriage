@@ -1,4 +1,4 @@
-"""Timestamp parsing for every log format bluetriage reads (used for time-window correlation)."""
+"""Timestamp parsing for every log format owltriage reads (used for time-window correlation)."""
 from __future__ import annotations
 
 import re

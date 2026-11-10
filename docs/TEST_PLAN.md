@@ -1,29 +1,31 @@
 # Test plan
 
+**Status:** 310 tests passing on Python 3.9 and 3.13 (incl. 278 real attack EVTX files) · 163 rule examples · mutation score 25/25
+
 ## Run it
 
 ```bash
 pip install -e ".[dev,evtx]"
-bluetriage rules test                     # every rule's match / no_match examples
+owltriage rules test                     # every rule's match / no_match examples
 python -m pytest -q                       # full suite (~50 s)
-python -m pytest --cov=bluetriage         # with coverage
-ruff check bluetriage tests main.py
+python -m pytest --cov=owltriage         # with coverage
+ruff check owltriage tests main.py
 
 # regression on ~280 real attack recordings (also a CI job)
 git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx-samples
-BLUETRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
+OWLTRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
 ```
 
 ## Strategy
 
-bluetriage reads input written by attackers (logs, event exports, alerts) and its output
+owltriage reads input written by attackers (logs, event exports, alerts) and its output
 drives firewall changes and team notifications. So besides "does it detect attacks", the
 suite proves what happens when input is hostile, malformed, huge or from another tool
 version, and when an external service misbehaves.
 
 | Layer | Where | What it proves |
 |---|---|---|
-| Rule self-tests | `bluetriage/rules/*.yml` → `test_rules.py` | Each of the 53 regex/event rules matches its `match` examples and none of its `no_match` look-alikes (160+ examples); every rule has both kinds; ATT&CK IDs exist; invalid rules fail loudly with file + rule id |
+| Rule self-tests | `owltriage/rules/*.yml` → `test_rules.py` | Each of the 53 regex/event rules matches its `match` examples and none of its `no_match` look-alikes (160+ examples); every rule has both kinds; ATT&CK IDs exist; invalid rules fail loudly with file + rule id |
 | Unit | `test_log_parser.py`, `test_detectors.py`, `test_defense.py`, `test_pipeline.py` | Parsing, brute-force thresholds, compromise logic, web signatures, block-rule planning, API response parsing |
 | Windows | `test_windows.py` | wevtutil XML, UTF-16 exports, Winlogbeat/flat JSON, Kerberos 4768/4771 spraying, PowerShell 4104, Sysmon 3 outbound, UTF-16 `-enc` decoding, truncated XML, XML entity refusal, missing optional `evtx` package |
 | Time windows & feeds | `test_feeds_exporters.py` | Window boundaries, feed download (size cap, HTTP errors, HTML instead of a list, atomic write), private/huge ranges refused, prefix-index lookups equal a naive scan (Hypothesis) |
@@ -31,6 +33,7 @@ version, and when an external service misbehaves.
 | HTTP integration | `test_http_integration.py` | Real HTTP to a local fake VirusTotal/AbuseIPDB/Discord/Slack/TheHive: headers, auth, 401/429/502, timeouts, partial TheHive failures |
 | E2E | `test_cli.py`, `test_block_script.py` | The CLI as a subprocess (exit codes 0/1/2, `--demo`, `--quiet`, `--allow`, `--fail-on`, custom and overriding rules, cached feeds, NDJSON alerts); `block_ips.sh` executed against a fake `iptables` (idempotent, undo, aborts on failure) |
 | Security & robustness | `test_security_robustness.py` | ANSI/markup/bidi injection, forged report lines, `@everyone`, Discord/Slack size limits, malformed alerts, Hypothesis fuzzing, ReDoS inputs, no Trojan-Source characters in the repo |
+| The owl & the summary | `test_banner_summary.py` | Animation only on an interactive terminal (off for pipes, CI, `--quiet`, `--no-anim`, tiny terminals); every frame of the story with a fake clock (branch → bar → walks with progress → looks around when stalled → home), constant frame height, ≤ 1.5 s budget, compact mode adds no time; a **real PTY run** checks the animation and its cost; the owl's summary tells the right stories and next steps; piped output has no colours or big logo |
 | Real attacks | `test_real_evtx.py` | ~280 EVTX-ATTACK-SAMPLES files parse without crashing; 12 known attacks stay detected |
 | Performance | `test_performance.py` | 100k lines well under the limit; memory does not grow with file size |
 
@@ -65,8 +68,11 @@ Bugs are injected into security-critical code one at a time; each must make the 
 | Regex input bound removed | `test_rule_regexes_have_bounded_input` |
 | Unknown rule keys accepted | `test_invalid_rules_are_rejected_with_a_clear_message` |
 | Feed download size limit removed | `test_update_feeds_end_to_end` |
+| Owl animation forced on for pipes | `test_animation_only_on_an_interactive_terminal` |
+| Animation budget blown (+2 s on finish) | `test_extra_time_is_about_one_and_a_half_seconds_for_a_fast_hunt` |
+| Owl's summary drops compromised accounts | `test_summary_tells_the_attack_stories` |
 
-**Score: 22/22.** The first run scored 21/22: the bounded-input test used a rule whose own quantifier already limited it, so it could not tell. It now uses an unbounded pattern.
+**Score: 25/25.** The first run scored 21/22: the bounded-input test used a rule whose own quantifier already limited it, so it could not tell. It now uses an unbounded pattern.
 
 ## Bugs found by testing v2 (all fixed)
 

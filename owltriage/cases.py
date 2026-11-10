@@ -18,7 +18,7 @@ def _cell(text) -> str:
 def build_case_payload(report) -> dict:
     mock = " (MOCK DATA)" if report.mock else ""
     md = [
-        f"Automatically opened by **Blue Team Auto-Triage**{mock}.",
+        f"Automatically opened by **OwlTriage**{mock}.",
         "",
         "### Alert",
         f"- **Wazuh alert:** `{report.alert_id}`",

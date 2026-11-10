@@ -22,6 +22,7 @@ from . import __version__
 from .defense import BlockRule
 from .detectors import AnalysisResult
 from .rules import RuleSet
+from .summary import Summary
 from .utils import SEVERITIES, SEVERITY_STYLE, clean, rel
 
 VERDICT_STYLE = {
@@ -47,8 +48,9 @@ def _stat(label: str, value, style: str = "bold") -> Text:
 
 def _banner(subtitle: str, mock: bool = False) -> Text:
     text = Text()
-    text.append("BLUETRIAGE", style="bold cyan")
-    text.append(f"  ·  {subtitle}", style="cyan")
+    text.append("(◉▼◉) ", style="bold #fbbf24")
+    text.append("OwlTriage", style="bold #60a5fa")
+    text.append(f"  ·  {subtitle}", style="#93c5fd")
     if mock:
         text.append("   MOCK DATA", style="bold magenta")
     return text
@@ -61,9 +63,35 @@ def _sources(result: AnalysisResult) -> str:
 # ---------------------------------------------------------------------------
 # hunt
 # ---------------------------------------------------------------------------
+def render_summary(console: Console, summary: Summary) -> None:
+    """Two aligned grids, so long lines wrap under their own text instead of under the badges."""
+    parts = [Text("What happened", style="bold #fbbf24")]
+    stories = Table.grid(padding=(0, 1))
+    stories.add_column(no_wrap=True)
+    stories.add_column(no_wrap=True, min_width=20)
+    stories.add_column(ratio=1)
+    for story in summary.stories:
+        stories.add_row(Text(f" {story.severity.upper():<8} ", style=SEVERITY_STYLE[story.severity]),
+                        Text(clean(story.who, 22), style="bold"), Text(clean(story.text, 160)))
+    parts.append(stories)
+    if summary.more:
+        parts.append(Text(f"  … and {summary.more} more in the findings table below", style="dim"))
+    if summary.steps:
+        parts += [Text(""), Text("What to do next", style="bold #fbbf24")]
+        steps = Table.grid(padding=(0, 1))
+        steps.add_column(no_wrap=True, justify="right")
+        steps.add_column(ratio=1)
+        for number, step in enumerate(summary.steps, 1):
+            steps.add_row(Text(f"  {number}.", style="bold #60a5fa"), Text(clean(step, 220)))
+        parts.append(steps)
+    console.print(Panel(Group(*parts), title="[bold #fbbf24](◉▼◉) The owl's summary[/]", title_align="left",
+                        border_style="#fbbf24", padding=(1, 2)))
+
+
 def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockRule],
                 skipped: Sequence[Tuple[str, str]], outputs: Dict[str, Path],
-                ruleset: Optional[RuleSet] = None, feed_note: str = "") -> None:
+                ruleset: Optional[RuleSet] = None, feed_note: str = "",
+                summary: Optional[Summary] = None) -> None:
     counts = result.severity_counts()
     verdicts = result.ip_verdicts()
     malicious = sum(v["verdict"] == "MALICIOUS" for v in verdicts)
@@ -77,7 +105,7 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
     header.append(f"   Rules: {result.rules_loaded}   Blocklist: {result.blocklist_size:,} entries", style="dim")
     if feed_note:
         header.append(f"\n{feed_note}", style="yellow" if "stale" in feed_note or "no feeds" in feed_note else "dim")
-    console.print(Panel(header, box=box.HEAVY, border_style="cyan"))
+    console.print(Panel(header, box=box.HEAVY, border_style="#3b82f6"))
 
     stats = Table.grid(expand=True, padding=(0, 1))
     for _ in range(5):
@@ -94,6 +122,8 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
         chips.append(f" {severity.upper()} {counts.get(severity, 0)} ", style=SEVERITY_STYLE[severity])
         chips.append("  ")
     console.print(Panel(Group(stats, Text(""), chips), title="Summary", border_style="blue"))
+    if summary is not None and (summary.stories or summary.steps):
+        render_summary(console, summary)
 
     if result.findings:
         table = Table(title="Findings", title_style="bold", box=box.SIMPLE_HEAVY, expand=True)
@@ -162,7 +192,8 @@ def render_hunt(console: Console, result: AnalysisResult, rules: Sequence[BlockR
 
 
 def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
-                      skipped: Sequence[Tuple[str, str]], path, ruleset: Optional[RuleSet] = None) -> Path:
+                      skipped: Sequence[Tuple[str, str]], path, ruleset: Optional[RuleSet] = None,
+                      summary: Optional[Summary] = None) -> Path:
     path = Path(path)
     counts = result.severity_counts()
     verdicts = result.ip_verdicts()
@@ -170,9 +201,9 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
     bar, rule_line = "=" * 78, "-" * 78
     lines: List[str] = [
         bar,
-        " BLUETRIAGE HUNT REPORT",
+        " (o v o)  OWLTRIAGE HUNT REPORT",
         bar,
-        f"Generated     : {datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S UTC} (bluetriage {__version__})",
+        f"Generated     : {datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S UTC} (owltriage {__version__})",
         f"Files         : {', '.join(clean(rel(f), 80) for f in result.files)}",
         f"Events        : {result.lines_scanned} ({_sources(result)})",
         f"Unique IPs    : {len(verdicts)}",
@@ -187,6 +218,17 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
         f"  Failed logins               : {sum(result.failed_by_ip.values())}",
         f"  Successful remote logins    : {sum(result.accepted_by_ip.values())}",
         "",
+    ]
+    if summary is not None and (summary.stories or summary.steps):
+        lines += ["THE OWL'S SUMMARY", rule_line, "  What happened:"]
+        lines += [f"    [{s.severity.upper():<8}] {clean(s.who, 22):<22} {clean(s.text, 160)}" for s in summary.stories]
+        if summary.more:
+            lines.append(f"    ... and {summary.more} more in FINDINGS below")
+        if summary.steps:
+            lines.append("  What to do next:")
+            lines += [f"    {n}. {clean(step, 200)}" for n, step in enumerate(summary.steps, 1)]
+        lines.append("")
+    lines += [
         "FINDINGS",
         rule_line,
     ]
@@ -222,10 +264,11 @@ def write_text_report(result: AnalysisResult, rules: Sequence[BlockRule],
     return path
 
 
-def write_json_report(result: AnalysisResult, rules: Sequence[BlockRule], path) -> Path:
+def write_json_report(result: AnalysisResult, rules: Sequence[BlockRule], path,
+                      summary: Optional[Summary] = None) -> Path:
     path = Path(path)
     data = {
-        "tool": "bluetriage",
+        "tool": "owltriage",
         "version": __version__,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "files": result.files,
@@ -237,6 +280,7 @@ def write_json_report(result: AnalysisResult, rules: Sequence[BlockRule], path) 
             "findings_by_severity": dict(result.severity_counts()),
             "attack_techniques": dict(result.technique_counts()),
         },
+        "summary": summary.as_dict() if summary is not None else None,
         "findings": [asdict(f) for f in result.findings],
         "ip_verdicts": result.ip_verdicts(),
         "block_rules": [{"ip": r.ip, "direction": r.direction, "reasons": r.reasons, "command": r.command()}

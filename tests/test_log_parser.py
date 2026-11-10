@@ -1,4 +1,4 @@
-from bluetriage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
+from owltriage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
 
 
 def test_failed_password_for_invalid_user():

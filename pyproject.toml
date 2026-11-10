@@ -3,14 +3,14 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bluetriage"
+name = "owltriage"
 dynamic = ["version"]
 description = "Offline-first, ATT&CK-mapped log triage for blue teams: Linux, web and Windows logs, YAML detection rules, threat feeds, STIX/Navigator export, Wazuh/TheHive/Discord integration."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Blue Team Auto-Triage contributors" }]
+authors = [{ name = "OwlTriage contributors" }]
 keywords = ["blue-team", "soc", "dfir", "threat-hunting", "mitre-attack", "detection-engineering", "wazuh", "thehive", "evtx", "sysmon"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -35,20 +35,20 @@ evtx = ["evtx>=0.8"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "hypothesis>=6.0", "ruff>=0.4", "stix2>=3.0"]
 
 [project.scripts]
-bluetriage = "bluetriage.cli:main"
+owltriage = "owltriage.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/Blue-Team-Triage-Tool"
-Issues = "https://github.com/your-username/Blue-Team-Triage-Tool/issues"
+Homepage = "https://github.com/your-username/owltriage"
+Issues = "https://github.com/your-username/owltriage/issues"
 
 [tool.setuptools.dynamic]
-version = { attr = "bluetriage.__version__" }
+version = { attr = "owltriage.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["bluetriage*"]
+include = ["owltriage*"]
 
 [tool.setuptools.package-data]
-bluetriage = ["rules/*.yml", "resources/*.yml", "resources/*.json", "resources/samples/*"]
+owltriage = ["rules/*.yml", "resources/*.yml", "resources/*.json", "resources/samples/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -64,4 +64,4 @@ ignore = ["E501", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004", "UP006"
           "S101", "S603", "S607", "PLW1510", "PLC0415", "PLR0917"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S105", "S108", "S311", "S113"]
+"tests/*" = ["S105", "S108", "S311", "S113", "S606"]

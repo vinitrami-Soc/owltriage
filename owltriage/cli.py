@@ -1,10 +1,10 @@
-"""bluetriage command line.
+"""owltriage command line.
 
-    bluetriage hunt --demo                       # try it: bundled Linux, web and Windows attack samples
-    bluetriage hunt /var/log/auth.log access.log Security.evtx
-    bluetriage update-feeds                      # download free threat feeds (optional, cron daily)
-    bluetriage rules list | rules test           # detection-as-code
-    bluetriage alert --demo                      # Wazuh alert -> VirusTotal/AbuseIPDB -> Discord/Slack/TheHive
+    owltriage hunt --demo                       # try it: bundled Linux, web and Windows attack samples
+    owltriage hunt /var/log/auth.log access.log Security.evtx
+    owltriage update-feeds                      # download free threat feeds (optional, cron daily)
+    owltriage rules list | rules test           # detection-as-code
+    owltriage alert --demo                      # Wazuh alert -> VirusTotal/AbuseIPDB -> Discord/Slack/TheHive
 """
 from __future__ import annotations
 
@@ -22,13 +22,15 @@ from rich.text import Text
 from . import __version__
 from .config import load_settings
 from .defense import parse_allowlist, plan_blocks, write_script
-from .detectors import analyze
+from .banner import HuntProgress, OwlShow, animation_mode, print_logo
+from .detectors import ScanProgress, analyze
 from .exporters import write_attack_layer, write_findings_ndjson, write_iocs_csv, write_stix_bundle
 from .feeds import default_feeds_dir, load_feed_specs, load_feeds_into, update_feeds
 from .intel import BadIPList
 from .pipeline import TriagePipeline, load_alerts, report_summary
 from .reporting import make_console, render_alert, render_hunt, write_json_report, write_text_report
 from .rules import RuleError, load_rules, run_rule_tests
+from .summary import summarize
 from .utils import SEVERITIES, SEVERITY_RANK, clean
 
 SAMPLES = Path(__file__).resolve().parent / "resources" / "samples"
@@ -38,15 +40,15 @@ SVG_WIDTH = 150
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="bluetriage",
+        prog="owltriage",
         description="ATT&CK-mapped log hunting (Linux, web, Windows) and alert enrichment for blue teams.",
         epilog="Docs: README.md · rule format: docs/RULES.md")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     def common(p, svg: bool = True):
-        p.add_argument("--out-dir", type=Path, default=Path("bluetriage-output"),
-                       help="where reports go (default: ./bluetriage-output)")
+        p.add_argument("--out-dir", type=Path, default=Path("owltriage-output"),
+                       help="where reports go (default: ./owltriage-output)")
         p.add_argument("--quiet", action="store_true", help="no terminal report (files and exit code only)")
         if svg:
             p.add_argument("--svg", type=Path, help="also save the terminal output as an SVG screenshot")
@@ -68,6 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="never generate block rules for this IP/range, e.g. your VPN (repeatable)")
     hunt.add_argument("--fail-on", choices=SEVERITIES[1:], metavar="SEVERITY",
                       help="exit 1 if any finding is at least this severity (cron/CI)")
+    hunt.add_argument("--no-anim", action="store_true",
+                      help="no owl animation (also off automatically for pipes, cron, CI and --quiet)")
     common(hunt)
 
     alert = sub.add_parser("alert", help="enrich Wazuh alerts, notify chat, open TheHive cases")
@@ -110,7 +114,7 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
         args.bad_ips.append(SAMPLES / "bad_ips.txt")
         args.no_feeds = True  # the demo must give the same result everywhere
     if not logs:
-        err.print(Text("No log files given. Try: bluetriage hunt --demo   or   bluetriage hunt /var/log/auth.log",
+        err.print(Text("No log files given. Try: owltriage hunt --demo   or   owltriage hunt /var/log/auth.log",
                        style="bold red"))
         return 2
     missing = [str(p) for p in logs if not p.is_file()]
@@ -126,6 +130,16 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
     if ruleset is None:
         return 2
 
+    # The owl: animated on an interactive terminal only (never for pipes, cron, CI, --quiet, --svg).
+    show = OwlShow(console, animation_mode(console, wanted=not (args.no_anim or args.quiet or args.svg)))
+    show.start()
+    try:
+        return _hunt(args, console, err, logs, allowlist, ruleset, show)
+    finally:
+        show.stop()
+
+
+def _hunt(args, console: Console, err: Console, logs: List[Path], allowlist, ruleset, show: OwlShow) -> int:
     bad_ips = BadIPList()
     for path in args.bad_ips:
         if path.is_file():
@@ -136,21 +150,26 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
     if not args.no_feeds:
         infos = load_feeds_into(bad_ips, args.feeds_dir)
         if not infos:
-            feed_note = "Threat feeds: none downloaded yet (optional): run `bluetriage update-feeds`"
+            feed_note = "Threat feeds: none downloaded yet (optional): run `owltriage update-feeds`"
         else:
             oldest = max((i.age_days or 999) for i in infos)
-            stale = " - stale, run `bluetriage update-feeds`" if any(i.stale for i in infos) else ""
+            stale = " - stale, run `owltriage update-feeds`" if any(i.stale for i in infos) else ""
             feed_note = (f"Threat feeds: {', '.join(f'{i.id} ({i.entries:,})' for i in infos)}; "
                          f"oldest {oldest:.1f} days{stale}")
 
-    result = analyze(logs, bad_ips, args.threshold, ruleset, args.window, args.year)
+    def progress(p: ScanProgress) -> None:
+        show.update(HuntProgress(p.file, p.file_no, p.files, p.events, p.findings, p.fraction))
+
+    result = analyze(logs, bad_ips, args.threshold, ruleset, args.window, args.year,
+                     on_progress=progress if show.mode != "off" else None)
     rules, skipped = plan_blocks(result.findings, allowlist)
+    summary = summarize(result, rules)
 
     out = args.out_dir
     out.mkdir(parents=True, exist_ok=True)
     outputs = {
-        "text": write_text_report(result, rules, skipped, out / "triage_report.txt", ruleset),
-        "json": write_json_report(result, rules, out / "triage_report.json"),
+        "text": write_text_report(result, rules, skipped, out / "triage_report.txt", ruleset, summary),
+        "json": write_json_report(result, rules, out / "triage_report.json", summary),
         "ndjson": write_findings_ndjson(result, ruleset, out / "findings.ndjson"),
         "csv": write_iocs_csv(result, out / "iocs.csv"),
         "stix": write_stix_bundle(result, out / "iocs.stix.json"),
@@ -159,7 +178,12 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
     if rules:
         outputs["script"] = write_script(rules, out / "block_ips.sh")
 
-    render_hunt(console, result, rules, skipped, outputs, ruleset, feed_note)
+    malicious = sum(v["verdict"] == "MALICIOUS" for v in result.ip_verdicts())
+    show.finish(Text(f"✔ hunt complete: {len(result.findings)} findings, {malicious} malicious IPs, "
+                     f"{len(result.technique_counts())} ATT&CK techniques", style="bold #4ade80"))
+    if not args.quiet and (console.is_terminal or args.svg):
+        print_logo(console, len(ruleset.enabled()))
+    render_hunt(console, result, rules, skipped, outputs, ruleset, feed_note, summary)
     for line_no, entry in bad_ips.invalid:
         err.print(Text(f"Ignored invalid blocklist entry on line {line_no}: {clean(entry, 60)}", style="yellow"))
     if args.fail_on and any(SEVERITY_RANK[f.severity] >= SEVERITY_RANK[args.fail_on] for f in result.findings):
@@ -172,7 +196,7 @@ def cmd_alert(args, console: Console, err: Console) -> int:
         args.alert_file = args.alert_file or SAMPLES / "dummy_alert.json"
         args.mock = args.dry_run = True
     if args.alert_file is None:
-        err.print(Text("No alert file given. Try: bluetriage alert --demo", style="bold red"))
+        err.print(Text("No alert file given. Try: owltriage alert --demo", style="bold red"))
         return 2
     if not args.alert_file.is_file():
         err.print(Text(f"Alert file not found: {args.alert_file}", style="bold red"))
@@ -262,7 +286,14 @@ def cmd_update_feeds(args, console: Console, err: Console) -> int:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    if not (sys.argv[1:] if argv is None else argv):  # bare `owltriage`: say hello, then show usage
+        console = make_console()
+        if console.is_terminal:
+            print_logo(console)
+        parser.print_help()
+        return 0
+    args = parser.parse_args(argv)
     svg = getattr(args, "svg", None)
     console = make_console(record=bool(svg), width=SVG_WIDTH if svg else None,
                            quiet=getattr(args, "quiet", False) and not svg)
@@ -275,7 +306,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if "--svg" in shown:
             index = shown.index("--svg")
             del shown[index:index + 2]
-        console.save_svg(str(svg), title="bluetriage " + " ".join(shown))
+        console.save_svg(str(svg), title="owltriage " + " ".join(shown))
     return code
 
 

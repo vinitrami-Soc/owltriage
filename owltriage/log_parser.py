@@ -61,6 +61,7 @@ class LogEvent:
     service: Optional[str] = None  # ssh, rdp, network, sudo, ...
     timestamp: Optional[str] = None
     epoch: Optional[float] = None
+    host: Optional[str] = None  # the machine that wrote the log (syslog hostname, Windows Computer)
     ip: Optional[str] = None  # the actor (SSH/HTTP client, logon source, or connection destination)
     direction: Optional[str] = None  # "outbound" when `ip` is a destination this host connected to
     user: Optional[str] = None
@@ -142,6 +143,7 @@ def parse_line(line: str, line_no: int = 0, source: str = "-", year: Optional[in
     if ts:
         event.timestamp = ts["ts"]
         event.epoch = to_epoch(ts["ts"], year)
+        event.host = raw[ts.end():].split(" ", 1)[0][:64] or None
     repeated = REPEATED.search(raw)
     if repeated:
         event.repeat = max(1, min(int(repeated.group(1)), 100_000))

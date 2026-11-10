@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from bluetriage.defense import BlockRule, write_script
+from owltriage.defense import BlockRule, write_script
 
 FAKE_IPTABLES = r"""#!/usr/bin/env bash
 state="${FAKE_IPT_STATE:?}"

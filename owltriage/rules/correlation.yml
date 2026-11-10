@@ -1,4 +1,4 @@
-# Built-in correlation rules. The stateful logic lives in bluetriage/detectors.py;
+# Built-in correlation rules. The stateful logic lives in owltriage/detectors.py;
 # everything here (severity, ATT&CK, thresholds, windows) can be tuned, or a rule
 # disabled, from your own rules directory. Example override file:
 #

@@ -66,7 +66,7 @@ def build_discord_payload(report) -> dict:
         "description": _trim(f"Wazuh alert {_code(_trim(report.alert_id, 100))} at {report.timestamp}", 400),
         "color": COLORS[sev],
         "fields": head + intel + [actions],
-        "footer": {"text": "Blue Team Auto-Triage" + (" · MOCK DATA" if report.mock else "")},
+        "footer": {"text": "OwlTriage" + (" · MOCK DATA" if report.mock else "")},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     hidden = 0
@@ -112,7 +112,7 @@ def build_slack_payload(report) -> dict:
         {"type": "section", "text": {"type": "mrkdwn", "text": _trim(
             "*Recommended actions*\n" + "\n".join(f"• {_slack(r)}" for r in report.recommendations), 3000)}},
         {"type": "context", "elements": [{"type": "mrkdwn", "text": _trim(
-            f"Alert {_slack(report.alert_id)} · Blue Team Auto-Triage" + (" · MOCK DATA" if report.mock else ""), 300)}]},
+            f"Alert {_slack(report.alert_id)} · OwlTriage" + (" · MOCK DATA" if report.mock else ""), 300)}]},
     ]
     return {"text": _trim(f"{sev.upper()}: {_slack(report.rule_description)}", 300), "blocks": blocks}
 

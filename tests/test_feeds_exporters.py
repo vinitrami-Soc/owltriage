@@ -11,14 +11,14 @@ import requests
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from bluetriage.detectors import Analyzer, analyze
-from bluetriage.exporters import write_attack_layer, write_findings_ndjson, write_iocs_csv, write_stix_bundle
-from bluetriage.feeds import FeedSpec, load_feed_specs, load_feeds_into, parse_feed_text, update_feeds
-from bluetriage.intel import BadIPList
-from bluetriage.log_parser import parse_line
-from bluetriage.rules import load_rules
+from owltriage.detectors import Analyzer, analyze
+from owltriage.exporters import write_attack_layer, write_findings_ndjson, write_iocs_csv, write_stix_bundle
+from owltriage.feeds import FeedSpec, load_feed_specs, load_feeds_into, parse_feed_text, update_feeds
+from owltriage.intel import BadIPList
+from owltriage.log_parser import parse_line
+from owltriage.rules import load_rules
 
-SAMPLES = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
+SAMPLES = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 
 
 # ---------------------------------------------------------------- feeds

@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Rule writing guide
-    url: https://github.com/your-username/Blue-Team-Triage-Tool/blob/main/docs/RULES.md
+    url: https://github.com/your-username/owltriage/blob/main/docs/RULES.md
     about: How to write and test a detection rule yourself

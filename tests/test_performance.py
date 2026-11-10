@@ -3,7 +3,7 @@ import random
 import time
 import tracemalloc
 
-from bluetriage.detectors import analyze
+from owltriage.detectors import analyze
 
 LINES = 100_000
 

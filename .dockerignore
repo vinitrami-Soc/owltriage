@@ -4,7 +4,7 @@ venv
 **/__pycache__
 .pytest_cache
 .hypothesis
-bluetriage-output
+owltriage-output
 output
 tests
 docs

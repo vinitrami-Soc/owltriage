@@ -9,32 +9,32 @@ Thanks for helping defenders! The most valuable contributions, in order:
 ## Development setup
 
 ```bash
-git clone https://github.com/your-username/Blue-Team-Triage-Tool.git
-cd Blue-Team-Triage-Tool
+git clone https://github.com/your-username/owltriage.git
+cd owltriage
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev,evtx]"
 
-bluetriage hunt --demo          # sanity check
-bluetriage rules test           # every rule's examples
+owltriage hunt --demo          # sanity check
+owltriage rules test           # every rule's examples
 python -m pytest -q             # full suite (~45 s)
-ruff check bluetriage tests main.py
+ruff check owltriage tests main.py
 ```
 
 Optional: run the regression suite against ~280 real attack recordings:
 
 ```bash
 git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx-samples
-BLUETRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
+OWLTRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
 ```
 
 ## Adding a rule in 5 steps
 
-1. Find the right file in `bluetriage/rules/` (`web.yml`, `commands.yml`, `linux.yml`,
+1. Find the right file in `owltriage/rules/` (`web.yml`, `commands.yml`, `linux.yml`,
    `windows.yml`) or create a new `.yml` file there.
 2. Write the rule with a `tests:` block containing `match` **and** `no_match` examples.
-3. If you use a new ATT&CK technique, add it to `bluetriage/resources/attack.yml` with the
+3. If you use a new ATT&CK technique, add it to `owltriage/resources/attack.yml` with the
    official name from attack.mitre.org.
-4. `bluetriage rules test your-rule-id`
+4. `owltriage rules test your-rule-id`
 5. If the attack is in EVTX-ATTACK-SAMPLES, add the file to `EXPECTED` in
    `tests/test_real_evtx.py` so it stays detected.
 

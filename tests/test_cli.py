@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-SAMPLES = ROOT / "bluetriage" / "resources" / "samples"
+SAMPLES = ROOT / "owltriage" / "resources" / "samples"
 SECRET_VARS = ("VT_API_KEY", "ABUSEIPDB_API_KEY", "DISCORD_WEBHOOK_URL", "SLACK_WEBHOOK_URL",
                "THEHIVE_URL", "THEHIVE_API_KEY")
 
@@ -18,8 +18,8 @@ def cli(*args, cwd=None, feeds_dir=None):
     env = {k: v for k, v in os.environ.items() if k not in SECRET_VARS}
     env["COLUMNS"] = "200"
     env["PYTHONPATH"] = str(ROOT)
-    env["BLUETRIAGE_FEEDS_DIR"] = str(feeds_dir or ROOT / "tests" / "no-feeds-here")
-    return subprocess.run([sys.executable, "-m", "bluetriage", *map(str, args)], capture_output=True, text=True,
+    env["OWLTRIAGE_FEEDS_DIR"] = str(feeds_dir or ROOT / "tests" / "no-feeds-here")
+    return subprocess.run([sys.executable, "-m", "owltriage", *map(str, args)], capture_output=True, text=True,
                           cwd=cwd or ROOT, env=env, timeout=120)
 
 
@@ -188,11 +188,11 @@ def test_alert_without_keys_warns_and_skips(tmp_path):
 def test_works_from_any_directory(tmp_path):
     run = cli("hunt", "--demo", cwd=tmp_path)
     assert run.returncode == 0
-    assert (tmp_path / "bluetriage-output" / "triage_report.txt").exists()
+    assert (tmp_path / "owltriage-output" / "triage_report.txt").exists()
 
 
 def test_main_py_shim_still_works(tmp_path):
-    env = {**os.environ, "BLUETRIAGE_FEEDS_DIR": str(tmp_path / "none")}
+    env = {**os.environ, "OWLTRIAGE_FEEDS_DIR": str(tmp_path / "none")}
     run = subprocess.run([sys.executable, str(ROOT / "main.py"), "hunt", "--demo", "--quiet", "--out-dir",
                           str(tmp_path)], capture_output=True, text=True, env=env, timeout=120)
     assert run.returncode == 0, run.stderr

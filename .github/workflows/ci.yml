@@ -29,9 +29,9 @@ jobs:
       - name: Install
         run: python -m pip install -e ".[dev,evtx]"
       - name: Lint
-        run: ruff check bluetriage tests main.py
+        run: ruff check owltriage tests main.py
       - name: Rule self-tests (every YAML rule's match / no_match examples)
-        run: bluetriage rules test
+        run: owltriage rules test
       - name: Test suite
         run: python -m pytest -q
 
@@ -49,4 +49,4 @@ jobs:
       - name: Known attacks must stay detected; no sample may crash the parser
         run: python -m pytest -q tests/test_real_evtx.py
         env:
-          BLUETRIAGE_EVTX_SAMPLES: /tmp/evtx-samples
+          OWLTRIAGE_EVTX_SAMPLES: /tmp/evtx-samples

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Wazuh custom integration: enrich alerts with owltriage.
+# Install as /var/ossec/integrations/custom-owltriage (see docs/WAZUH.md).
+#
+# wazuh-integratord calls:  custom-owltriage <alert_file> [api_key] [hook_url]
+# Keys and webhooks come from the owltriage .env file below, not from ossec.conf.
+
+OWLTRIAGE_BIN="/opt/owltriage/venv/bin/owltriage"   # where you installed owltriage
+OWLTRIAGE_ENV="/opt/owltriage/.env"                  # VT_API_KEY, DISCORD_WEBHOOK_URL, ...
+OUT_DIR="/var/ossec/logs/owltriage"                   # audit log + payloads (writable by wazuh)
+
+ALERT_FILE="$1"
+if [ ! -r "$ALERT_FILE" ]; then
+    echo "custom-owltriage: cannot read alert file '$ALERT_FILE'" >&2
+    exit 1
+fi
+exec "$OWLTRIAGE_BIN" alert "$ALERT_FILE" --env-file "$OWLTRIAGE_ENV" --out-dir "$OUT_DIR" --quiet

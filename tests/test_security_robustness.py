@@ -10,16 +10,16 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from rich.console import Console
 
-from bluetriage.config import Settings
-from bluetriage.defense import plan_blocks
-from bluetriage.detectors import Analyzer, decode_base64_blobs
-from bluetriage.intel import BadIPList
-from bluetriage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
-from bluetriage.notify import build_discord_payload, build_slack_payload
-from bluetriage.pipeline import TriagePipeline, TriageReport, assess, extract_observables
-from bluetriage.enrichment import IntelResult
-from bluetriage.reporting import render_alert, render_hunt, write_text_report
-from bluetriage.utils import clean
+from owltriage.config import Settings
+from owltriage.defense import plan_blocks
+from owltriage.detectors import Analyzer, decode_base64_blobs
+from owltriage.intel import BadIPList
+from owltriage.log_parser import extract_ips, normalize_ip, parse_line, url_decode
+from owltriage.notify import build_discord_payload, build_slack_payload
+from owltriage.pipeline import TriagePipeline, TriageReport, assess, extract_observables
+from owltriage.enrichment import IntelResult
+from owltriage.reporting import render_alert, render_hunt, write_text_report
+from owltriage.utils import clean
 
 
 class NoNetwork:

@@ -1,4 +1,4 @@
-# MITRE ATT&CK (Enterprise) techniques referenced by bluetriage rules.
+# MITRE ATT&CK (Enterprise) techniques referenced by owltriage rules.
 # Every `mitre:` ID in a rule must exist here, which catches typos in pull requests.
 # Adding a rule that needs a new technique? Add it here with its official name
 # from https://attack.mitre.org/techniques/enterprise/

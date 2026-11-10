@@ -1,19 +1,28 @@
-# bluetriage
+<p align="center"><img src="docs/owl-animation.gif" alt="OwlTriage: the owl hops off its branch, walks the loading bar with the hunt's progress, and flies home" width="900"></p>
 
-> **Blue Team Auto-Triage.** One command turns raw Linux, web and Windows logs into ATT&CK-mapped findings, IOCs and ready-to-review firewall rules. It runs offline, its detections are YAML that anyone can write, and it is a 3AM-approved first look before you open the SIEM.
+<h1 align="center">OwlTriage</h1>
+<p align="center"><b>Sees in the dark. Triages before you wake up.</b></p>
+
+One command turns raw Linux, web and Windows logs into an **owl's summary of what happened and what to do next**, ATT&CK-mapped findings, IOCs and ready-to-review firewall rules. It runs offline, its detections are YAML that anyone can write, and it gives you a 3AM-approved first look before you open the SIEM.
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Rules](https://img.shields.io/badge/rules-59-orange) ![ATT%26CK](https://img.shields.io/badge/ATT%26CK-36%20techniques-red) ![Tests](https://img.shields.io/badge/tests-pytest%20%2B%20real%20EVTX%20regression-brightgreen) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ```bash
-pip install "bluetriage[evtx] @ git+https://github.com/your-username/Blue-Team-Triage-Tool"
-bluetriage hunt --demo
+pip install "owltriage[evtx] @ git+https://github.com/your-username/owltriage"
+owltriage hunt --demo
 ```
 
-![bluetriage hunt --demo](docs/hunt.png)
+## What you get
+
+The report opens with **the owl's summary**: the attack stories in plain sentences, and numbered next steps (accounts to reset, hosts to isolate, IPs to block, persistence to remove). Then come the evidence (findings with ATT&CK IDs and file:line), IP verdicts and a firewall script.
+
+![owltriage hunt --demo](docs/hunt.png)
+
+While a hunt runs, the owl from the logo hops onto the loading bar and walks with the real progress, turning its head and looking around whenever a big file slows things down. It adds about 1.5 seconds and only appears on an interactive terminal: never for pipes, cron, CI, `--quiet` or `--no-anim`. On small terminals it becomes a one-line `(◉▼◉)` walker.
 
 ## Why
 
-| You are... | bluetriage gives you |
+| You are... | owltriage gives you |
 |---|---|
 | **An incident responder** on a box you just SSH'd into | A triage of `auth.log`, web logs or `Security.evtx` in seconds, with no agent, SIEM or internet |
 | **A small team** without a SIEM | Scheduled hunts, free threat feeds and Discord/Slack alerts |
@@ -37,25 +46,26 @@ Formats are detected from the file content, so you can mix them in one run.
 ## Quick start
 
 ```bash
-bluetriage hunt --demo                                   # bundled Linux + web + Windows attack story
-bluetriage hunt /var/log/auth.log /var/log/nginx/access.log
-bluetriage hunt Security.evtx Sysmon.evtx --window 300   # needs the [evtx] extra
-bluetriage hunt logs/*.log --fail-on high --quiet         # cron / CI: exit 1 on high+
+owltriage hunt --demo                                   # bundled Linux + web + Windows attack story
+owltriage hunt /var/log/auth.log /var/log/nginx/access.log
+owltriage hunt Security.evtx Sysmon.evtx --window 300   # needs the [evtx] extra
+owltriage hunt logs/*.log --fail-on high --quiet         # cron / CI: exit 1 on high+
+owltriage hunt big.evtx --no-anim                        # plain output, no owl
 ```
 
 No `pip`? Run from a checkout: `pip install -r requirements.txt && python main.py hunt --demo`.
-Docker: `docker build -t bluetriage . && docker run --rm -v "$PWD:/work" bluetriage hunt --demo`.
+Docker: `docker build -t owltriage . && docker run --rm -v "$PWD:/work" owltriage hunt --demo`.
 
 Windows without the `evtx` package: export first with `wevtutil qe Security /f:xml > security.xml`.
 
 ## Outputs
 
-Every hunt writes to `./bluetriage-output/` (change it with `--out-dir`):
+Every hunt writes to `./owltriage-output/` (change it with `--out-dir`):
 
 | File | For |
 |---|---|
-| `triage_report.txt` | Humans: summary, findings, ATT&CK coverage, IP verdicts |
-| `triage_report.json` | Scripts |
+| `triage_report.txt` | Humans: the owl's summary, findings, ATT&CK coverage, IP verdicts |
+| `triage_report.json` | Scripts (includes the summary: stories and next steps) |
 | `findings.ndjson` | **Elastic / Splunk / Wazuh / Graylog**: one ECS-style JSON per finding (`rule.*`, `threat.technique.*`, `source.ip`) |
 | `iocs.csv` | Spreadsheets, firewall and EDR import |
 | `iocs.stix.json` | **MISP / OpenCTI**: a STIX 2.1 bundle with deterministic IDs, so re-imports update instead of duplicating |
@@ -64,7 +74,7 @@ Every hunt writes to `./bluetriage-output/` (change it with `--out-dir`):
 
 ## Detection as code
 
-All 59 detections are YAML in [`bluetriage/rules/`](bluetriage/rules/). Each one carries ATT&CK IDs and its own tests:
+All 59 detections are YAML in [`owltriage/rules/`](owltriage/rules/). Each one carries ATT&CK IDs and its own tests:
 
 ```yaml
 - id: cmd-inhibit-recovery
@@ -80,9 +90,9 @@ All 59 detections are YAML in [`bluetriage/rules/`](bluetriage/rules/). Each one
 ```
 
 ```bash
-bluetriage rules list                     # what is loaded
-bluetriage rules test                     # 160+ examples, also run in CI
-bluetriage hunt logs/ --rules-dir ./my-rules   # add rules, or tune / disable built-ins by id
+owltriage rules list                     # what is loaded
+owltriage rules test                     # 160+ examples, also run in CI
+owltriage hunt logs/ --rules-dir ./my-rules   # add rules, or tune / disable built-ins by id
 ```
 
 Tuning without forking, in `my-rules/tuning.yml`:
@@ -100,20 +110,20 @@ Rule types (`web`, `command`, `line`, `event`, `correlation`) and the quality ch
 ## Threat feeds (optional)
 
 ```bash
-bluetriage update-feeds          # IPsum, abuse.ch Feodo Tracker, blocklist.de, Emerging Threats
-bluetriage update-feeds --list   # what is configured and how old the cache is
+owltriage update-feeds          # IPsum, abuse.ch Feodo Tracker, blocklist.de, Emerging Threats
+owltriage update-feeds --list   # what is configured and how old the cache is
 ```
 
-Feeds are cached under `~/.cache/bluetriage/feeds` and loaded by every `hunt`, so hunts stay offline. Feeds can't flag private, reserved or wider-than-/8 ranges, so a broken feed never marks your LAN as malicious. Add your own feeds with `--feeds-config`. Check each provider's terms before commercial use.
+Feeds are cached under `~/.cache/owltriage/feeds` and loaded by every `hunt`, so hunts stay offline. Feeds can't flag private, reserved or wider-than-/8 ranges, so a broken feed never marks your LAN as malicious. Add your own feeds with `--feeds-config`. Check each provider's terms before commercial use.
 
 ## Alert enrichment (Wazuh → VirusTotal / AbuseIPDB → Discord / Slack / TheHive)
 
-![bluetriage alert --demo](docs/alert.png)
+![owltriage alert --demo](docs/alert.png)
 
 ```bash
-bluetriage alert --demo                         # sample alert, fake API answers, nothing sent
+owltriage alert --demo                         # sample alert, fake API answers, nothing sent
 cp .env.example .env                            # VT_API_KEY, ABUSEIPDB_API_KEY, webhooks, TheHive
-bluetriage alert /var/ossec/logs/alerts/alerts.json --dry-run   # real lookups, save payloads only
+owltriage alert /var/ossec/logs/alerts/alerts.json --dry-run   # real lookups, save payloads only
 ```
 
 It pulls the attacker IP and the strongest file hash from the alert (internal IPs are never sent to external APIs) and enriches them within the VirusTotal free-tier rate limit. When a score crosses the threshold (VT > 5 or AbuseIPDB ≥ 50 % by default) it posts a Discord embed / Slack message and opens a TheHive case with observables. Every alert is logged to `alert_results.ndjson`. To run it automatically from Wazuh, see **[docs/WAZUH.md](docs/WAZUH.md)**.

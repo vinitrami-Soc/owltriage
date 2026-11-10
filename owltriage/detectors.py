@@ -1,6 +1,6 @@
 """Detection engine: turns `LogEvent`s from any source into ATT&CK-mapped `Finding`s.
 
-What fires is decided by the YAML rules in bluetriage/rules/ (see rules.py):
+What fires is decided by the YAML rules in owltriage/rules/ (see rules.py):
 web / command / line / event rules are regexes and field matches; the six
 correlation rules below are stateful and implemented here, tuned from YAML:
 
@@ -18,12 +18,13 @@ import binascii
 import re
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from .intel import BadIPList
 from .log_parser import LogEvent, extract_ips
 from .rules import Rule, RuleSet, load_rules, render_template
-from .sources import iter_events
+from .sources import detect_format, iter_events
 from .timeutil import iso_utc
 from .utils import SEVERITY_RANK, clean, max_severity, severity_rank, verdict_for
 from .windows import SourceError
@@ -49,6 +50,7 @@ class Finding:
     mitre: List[str] = field(default_factory=list)
     timestamp: Optional[str] = None  # first occurrence, ISO 8601 UTC when parseable
     user: Optional[str] = None
+    host: Optional[str] = None
 
     @property
     def location(self) -> str:
@@ -117,6 +119,9 @@ class FindingCollector:
             existing.count += finding.count
         else:
             self._items[key] = finding
+
+    def __len__(self) -> int:
+        return len(self._items)
 
     def sorted(self) -> List[Finding]:
         return sorted(self._items.values(),
@@ -210,13 +215,33 @@ class Analyzer:
         self._inbound: Set[str] = set()
 
     # -- input ---------------------------------------------------------------
-    def scan_file(self, path, year: Optional[int] = None) -> None:
+    def scan_file(self, path, year: Optional[int] = None,
+                  on_progress: Optional[Callable[[ScanProgress], None]] = None,
+                  file_no: int = 1, files: int = 1, done_bytes: int = 0, total_bytes: int = 0) -> None:
         self.result.files.append(str(path))
+        size = Path(path).stat().st_size if on_progress else 0
+        total = max(total_bytes or size, 1)
+        # Bytes per event for formats whose events don't map 1:1 to text lines (rough, only for the bar).
+        per_event = {"evtx": 900, "windows-xml": 1100}.get(detect_format(path), 0) if on_progress else 0
+        seen_bytes, count = 0, 0
+
+        def report(final: bool = False) -> None:
+            estimate = size if final else min(seen_bytes, size * 0.98)
+            on_progress(ScanProgress(Path(path).name, file_no, files, self.result.lines_scanned,
+                                     len(self._findings), min(1.0, (done_bytes + estimate) / total)))
+
         try:
             for event in iter_events(path, year=year):
                 self.feed(event)
+                if on_progress:
+                    count += 1
+                    seen_bytes += per_event or len(event.raw) + 1
+                    if count % 256 == 0:
+                        report()
         except SourceError as exc:
             self.result.warnings.append(str(exc))
+        if on_progress:
+            report(final=True)
 
     def feed(self, event: LogEvent) -> None:
         result = self.result
@@ -264,7 +289,8 @@ class Analyzer:
             source=event.source if event else None, line_no=event.line_no if event else None,
             evidence=event.raw if evidence is None and event is not None else (evidence or ""),
             block=block if ip else None, rule_id=rule.id, mitre=list(rule.mitre if mitre is None else mitre),
-            timestamp=when, user=event.user if event else None), key_extra=key_extra)
+            timestamp=when, user=event.user if event else None, host=event.host if event else None),
+            key_extra=key_extra)
 
     # -- authentication --------------------------------------------------------
     def _recent_failures(self, ip: str, now: Optional[float]) -> int:
@@ -412,10 +438,25 @@ class Analyzer:
                                       detail=f"found inside decoded base64{note}")
 
 
+@dataclass
+class ScanProgress:
+    file: str
+    file_no: int
+    files: int
+    events: int
+    findings: int
+    fraction: float  # 0..1 of all bytes (estimated for binary/XML formats)
+
+
 def analyze(paths: Iterable, bad_ips: Optional[BadIPList] = None, brute_threshold: Optional[int] = None,
             ruleset: Optional[RuleSet] = None, window_seconds: Optional[int] = None,
-            year: Optional[int] = None) -> AnalysisResult:
+            year: Optional[int] = None,
+            on_progress: Optional[Callable[[ScanProgress], None]] = None) -> AnalysisResult:
     analyzer = Analyzer(bad_ips, brute_threshold, ruleset, window_seconds)
-    for path in paths:
-        analyzer.scan_file(path, year=year)
+    paths = list(paths)
+    sizes = [Path(p).stat().st_size for p in paths] if on_progress else [0] * len(paths)
+    done = 0
+    for number, (path, size) in enumerate(zip(paths, sizes), 1):
+        analyzer.scan_file(path, year, on_progress, number, len(paths), done, sum(sizes))
+        done += size
     return analyzer.finish()

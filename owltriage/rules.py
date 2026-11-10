@@ -7,7 +7,7 @@ Rule types
   event        structured match on Windows events: event_id + provider/channel + field regexes
   correlation  built-in stateful logic (brute force, blocklist, ...); YAML tunes it
 
-Packaged rules live in bluetriage/rules/. Extra directories (`--rules-dir`) are
+Packaged rules live in owltriage/rules/. Extra directories (`--rules-dir`) are
 merged on top: a rule with an existing `id` updates only the keys it sets, so
 `{id: auth-brute-force, threshold: 10}` or `{id: web-xss, enabled: false}` is
 all it takes to tune or disable a rule. See docs/RULES.md.

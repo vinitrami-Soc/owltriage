@@ -2,9 +2,9 @@ import base64
 
 import pytest
 
-from bluetriage.detectors import Analyzer, decode_base64_blobs
-from bluetriage.intel import BadIPList
-from bluetriage.log_parser import parse_line
+from owltriage.detectors import Analyzer, decode_base64_blobs
+from owltriage.intel import BadIPList
+from owltriage.log_parser import parse_line
 
 FAILED = "Nov  9 03:11:{s:02d} web01 sshd[1]: Failed password for {user} from {ip} port 5{s:04d} ssh2"
 ACCEPTED = "Nov  9 03:12:00 web01 sshd[2]: Accepted password for {user} from {ip} port 50000 ssh2"

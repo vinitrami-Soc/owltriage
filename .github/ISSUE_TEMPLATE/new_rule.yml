@@ -1,5 +1,5 @@
 name: Detection request
-description: Suggest an attack technique bluetriage should detect
+description: Suggest an attack technique owltriage should detect
 labels: ["new-rule", "rules"]
 body:
   - type: input

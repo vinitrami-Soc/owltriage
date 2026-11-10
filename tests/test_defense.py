@@ -1,7 +1,7 @@
 import pytest
 
-from bluetriage.defense import BlockRule, parse_allowlist, plan_blocks, render_script
-from bluetriage.detectors import Finding
+from owltriage.defense import BlockRule, parse_allowlist, plan_blocks, render_script
+from owltriage.detectors import Finding
 
 
 def finding(ip, severity="high", block="inbound", rule="BAD_IP_MATCH"):

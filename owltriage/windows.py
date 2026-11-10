@@ -1,7 +1,7 @@
 """Windows event logs: wevtutil XML exports, .evtx files and JSON lines (Winlogbeat or flat).
 
     wevtutil qe Security /f:xml > security.xml        # export on the Windows box
-    bluetriage hunt security.xml                       # or Security.evtx with `pip install bluetriage[evtx]`
+    owltriage hunt security.xml                       # or Security.evtx with `pip install owltriage[evtx]`
 
 All XML goes through defusedxml (no DTDs, entity expansion or external
 entities): event logs are attacker-influenced input.
@@ -122,7 +122,8 @@ def event_from_record(record: Dict[str, Any], source: str, number: int) -> LogEv
     time = record.get("time")
     event = LogEvent(source=source, line_no=number, raw=raw[:4000], kind="event", log_type="windows",
                      timestamp=str(time) if time else None, epoch=to_epoch(str(time)) if time else None,
-                     event_id=event_id, channel=record.get("channel") or "", provider=provider, fields=fields)
+                     event_id=event_id, channel=record.get("channel") or "", provider=provider, fields=fields,
+                     host=(str(record.get("computer") or "")[:64] or None))
 
     ips: List[str] = []
     for name in IP_FIELDS:
@@ -186,7 +187,7 @@ class _ChunkReader(io.RawIOBase):
 def _xml_chunks(path: Path) -> Iterator[bytes]:
     """wevtutil prints many <Event> roots back to back; wrap them in one root element.
     UTF-16 exports (PowerShell 5 redirection) are re-encoded to UTF-8 on the fly."""
-    yield b"<bluetriage-events>"
+    yield b"<owltriage-events>"
     with path.open("rb") as handle:
         head = handle.read(65536)
         if head.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
@@ -206,7 +207,7 @@ def _xml_chunks(path: Path) -> Iterator[bytes]:
             head = head[head.find(b"?>") + 2:]
         yield head
         yield from rest
-    yield b"</bluetriage-events>"
+    yield b"</owltriage-events>"
 
 
 def iter_windows_xml(path) -> Iterator[LogEvent]:
@@ -235,7 +236,7 @@ def iter_evtx(path) -> Iterator[LogEvent]:
         from evtx import PyEvtxParser
     except ImportError:
         raise SourceError(
-            f"{path.name}: reading .evtx needs the optional 'evtx' package: pip install 'bluetriage[evtx]'. "
+            f"{path.name}: reading .evtx needs the optional 'evtx' package: pip install 'owltriage[evtx]'. "
             "Or export on Windows with: wevtutil qe Security /f:xml > security.xml") from None
     try:
         parser = PyEvtxParser(str(path))

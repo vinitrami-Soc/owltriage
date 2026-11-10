@@ -238,7 +238,7 @@ class TriagePipeline:
         self.out_dir = Path(out_dir)
         self.session = session or requests.Session()
         if hasattr(self.session, "headers"):
-            self.session.headers["User-Agent"] = f"blue-team-auto-triage/{__version__}"
+            self.session.headers["User-Agent"] = f"owltriage/{__version__}"
 
         mock_data = load_mock_responses() if mock else None
         common = dict(session=self.session, timeout=settings.timeout, mock_data=mock_data)

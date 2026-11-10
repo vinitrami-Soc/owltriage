@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 import requests
 
-from bluetriage import enrichment
-from bluetriage.config import Settings
-from bluetriage.pipeline import TriagePipeline, load_alerts
+from owltriage import enrichment
+from owltriage.config import Settings
+from owltriage.pipeline import TriagePipeline, load_alerts
 
-DATA = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
+DATA = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 EICAR = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
-MOCK = json.loads((Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "mock_intel.json").read_text())
+MOCK = json.loads((Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "mock_intel.json").read_text())
 
 
 class FakeSOC:
@@ -121,7 +121,7 @@ def test_full_live_pipeline_over_http(soc, tmp_path):
     abuse = soc.find("GET", "/api/v2/check")[0]
     assert abuse["headers"]["Key"] == "abuse-key"
     assert "ipAddress=203.0.113.5" in abuse["path"] and "maxAgeInDays=90" in abuse["path"]
-    assert all(c["headers"]["User-Agent"].startswith("blue-team-auto-triage/") for c in soc.requests)
+    assert all(c["headers"]["User-Agent"].startswith("owltriage/") for c in soc.requests)
 
     case = soc.find("POST", "/api/v1/case")[0]
     assert case["headers"]["Authorization"] == "Bearer hive-key"

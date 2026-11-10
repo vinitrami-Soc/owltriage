@@ -1,7 +1,7 @@
 """Detection-as-code quality gates: every packaged rule is valid, mapped to ATT&CK and self-tested."""
 import pytest
 
-from bluetriage.rules import RuleError, build_rule, load_rules, load_techniques, render_template, run_rule_tests
+from owltriage.rules import RuleError, build_rule, load_rules, load_techniques, render_template, run_rule_tests
 
 RULESET = load_rules()
 TECHNIQUES = load_techniques()

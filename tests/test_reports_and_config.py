@@ -6,13 +6,13 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from bluetriage.config import load_settings
-from bluetriage.defense import plan_blocks
-from bluetriage.detectors import analyze
-from bluetriage.intel import BadIPList
-from bluetriage.reporting import render_hunt, write_json_report, write_text_report
+from owltriage.config import load_settings
+from owltriage.defense import plan_blocks
+from owltriage.detectors import analyze
+from owltriage.intel import BadIPList
+from owltriage.reporting import render_hunt, write_json_report, write_text_report
 
-DATA = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
+DATA = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 
 
 @pytest.fixture(scope="module")

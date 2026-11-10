@@ -1,18 +1,18 @@
 """Regression test against real attack recordings (EVTX-ATTACK-SAMPLES). Skipped unless available:
 
     git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx-samples
-    BLUETRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest tests/test_real_evtx.py
+    OWLTRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest tests/test_real_evtx.py
 """
 import os
 from pathlib import Path
 
 import pytest
 
-from bluetriage.detectors import analyze
-from bluetriage.rules import load_rules
+from owltriage.detectors import analyze
+from owltriage.rules import load_rules
 
-ROOT = Path(os.environ.get("BLUETRIAGE_EVTX_SAMPLES", "/nonexistent"))
-pytestmark = pytest.mark.skipif(not ROOT.is_dir(), reason="set BLUETRIAGE_EVTX_SAMPLES to run")
+ROOT = Path(os.environ.get("OWLTRIAGE_EVTX_SAMPLES", "/nonexistent"))
+pytestmark = pytest.mark.skipif(not ROOT.is_dir(), reason="set OWLTRIAGE_EVTX_SAMPLES to run")
 RULES = load_rules() if ROOT.is_dir() else None
 
 EXPECTED = {

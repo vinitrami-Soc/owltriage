@@ -1,7 +1,7 @@
-"""Download and cache free IP threat feeds (`bluetriage update-feeds`).
+"""Download and cache free IP threat feeds (`owltriage update-feeds`).
 
 Feeds are stored as plain text in the cache directory and loaded automatically
-by `bluetriage hunt`, so the hunt itself stays offline: run update-feeds from
+by `owltriage hunt`, so the hunt itself stays offline: run update-feeds from
 cron once a day, hunt as often as you like.
 """
 from __future__ import annotations
@@ -30,10 +30,10 @@ _SPLIT = re.compile(r"[\s,;#]")
 
 
 def default_feeds_dir() -> Path:
-    if os.environ.get("BLUETRIAGE_FEEDS_DIR"):
-        return Path(os.environ["BLUETRIAGE_FEEDS_DIR"])
+    if os.environ.get("OWLTRIAGE_FEEDS_DIR"):
+        return Path(os.environ["OWLTRIAGE_FEEDS_DIR"])
     cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    return cache / "bluetriage" / "feeds"
+    return cache / "owltriage" / "feeds"
 
 
 @dataclass
@@ -122,7 +122,7 @@ def update_feeds(specs: Sequence[FeedSpec], feeds_dir: Optional[Path] = None,
     feeds_dir.mkdir(parents=True, exist_ok=True)
     session = session or requests.Session()
     if hasattr(session, "headers"):
-        session.headers["User-Agent"] = f"bluetriage/{__version__} (+feed updater)"
+        session.headers["User-Agent"] = f"owltriage/{__version__} (+feed updater)"
     results = []
     for spec in specs:
         if only and spec.id not in only:
@@ -144,7 +144,7 @@ def update_feeds(specs: Sequence[FeedSpec], feeds_dir: Optional[Path] = None,
             continue
         target = feeds_dir / f"{spec.id}.txt"
         tmp = target.with_suffix(".tmp")
-        header = [f"# bluetriage feed: {spec.id}", f"# source: {spec.url}",
+        header = [f"# owltriage feed: {spec.id}", f"# source: {spec.url}",
                   f"# fetched_at: {iso_utc(datetime.now(timezone.utc).timestamp())}", f"# entries: {len(kept)}"]
         tmp.write_text("\n".join(header + kept) + "\n", encoding="utf-8")
         os.replace(tmp, target)  # atomic: a hunt never reads a half-written feed

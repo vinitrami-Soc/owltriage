@@ -23,7 +23,7 @@ from .utils import SEVERITY_RANK
 # Deterministic STIX ids: the same IP gets the same indicator id on every run,
 # so re-importing into MISP/OpenCTI updates instead of duplicating.
 STIX_NAMESPACE = uuid.UUID("6a2f3c1e-8b8d-4c6f-9a51-3f4b2d7e9c10")
-IDENTITY_ID = f"identity--{uuid.uuid5(STIX_NAMESPACE, 'bluetriage')}"
+IDENTITY_ID = f"identity--{uuid.uuid5(STIX_NAMESPACE, 'owltriage')}"
 
 
 def _now() -> str:
@@ -37,14 +37,14 @@ def write_findings_ndjson(result: AnalysisResult, ruleset: RuleSet, path) -> Pat
         for f in result.findings:
             doc = {
                 "@timestamp": f.timestamp or generated,
-                "event": {"kind": "alert", "module": "bluetriage", "severity": SEVERITY_RANK[f.severity],
+                "event": {"kind": "alert", "module": "owltriage", "severity": SEVERITY_RANK[f.severity],
                           "count": f.count, "created": generated},
                 "rule": {"id": f.rule_id, "name": f.rule, "description": f.title},
                 "threat": {"framework": "MITRE ATT&CK", "technique": {
                     "id": f.mitre, "name": [ruleset.technique_name(t) for t in f.mitre]}},
                 "message": f"{f.title}: {f.detail}",
                 "log": {"file": {"path": f.source}, "line": f.line_no},
-                "bluetriage": {"severity": f.severity, "evidence": f.evidence[:2000], "block": f.block},
+                "owltriage": {"severity": f.severity, "evidence": f.evidence[:2000], "block": f.block},
             }
             if f.ip:
                 doc["source"] = {"ip": f.ip}
@@ -74,7 +74,7 @@ def write_stix_bundle(result: AnalysisResult, path) -> Path:
     now = _now()
     objects: List[dict] = [{
         "type": "identity", "spec_version": "2.1", "id": IDENTITY_ID, "created": now, "modified": now,
-        "name": "Blue Team Auto-Triage", "identity_class": "system",
+        "name": "OwlTriage", "identity_class": "system",
     }]
     for row in _ioc_rows(result):
         kind = "ipv6-addr" if ipaddress.ip_address(row["ip"]).version == 6 else "ipv4-addr"
@@ -83,11 +83,11 @@ def write_stix_bundle(result: AnalysisResult, path) -> Path:
             "id": f"indicator--{uuid.uuid5(STIX_NAMESPACE, row['ip'])}",
             "created": now, "modified": now, "valid_from": now, "created_by_ref": IDENTITY_ID,
             "name": f"{row['verdict'].title()} IP {row['ip']}",
-            "description": f"Observed by bluetriage: {', '.join(row['reasons'])}",
+            "description": f"Observed by owltriage: {', '.join(row['reasons'])}",
             "indicator_types": ["malicious-activity"] if row["verdict"] == "MALICIOUS" else ["anomalous-activity"],
             "pattern": f"[{kind}:value = '{row['ip']}']", "pattern_type": "stix",
             "confidence": 85 if row["verdict"] == "MALICIOUS" else 50,
-            "labels": [f"mitre:{t}" for t in row["mitre"]] or ["bluetriage"],
+            "labels": [f"mitre:{t}" for t in row["mitre"]] or ["owltriage"],
         })
     bundle = {"type": "bundle", "id": f"bundle--{uuid.uuid4()}", "objects": objects}
     path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
@@ -103,10 +103,10 @@ def write_attack_layer(result: AnalysisResult, ruleset: RuleSet, path) -> Path:
         for technique in f.mitre:
             rules_by_technique.setdefault(technique, set()).add(f.title)
     layer = {
-        "name": "bluetriage findings",
+        "name": "owltriage findings",
         "versions": {"layer": "4.5"},
         "domain": "enterprise-attack",
-        "description": f"Techniques observed by bluetriage {__version__} in: "
+        "description": f"Techniques observed by owltriage {__version__} in: "
                        + ", ".join(Path(f).name for f in result.files),
         "sorting": 3,
         "hideDisabled": False,
@@ -117,7 +117,7 @@ def write_attack_layer(result: AnalysisResult, ruleset: RuleSet, path) -> Path:
         ],
         "gradient": {"colors": ["#ffe0a3", "#ff6666"], "minValue": 0, "maxValue": max(counts.values(), default=1)},
         "legendItems": [],
-        "metadata": [{"name": "generated_by", "value": f"bluetriage {__version__}"}],
+        "metadata": [{"name": "generated_by", "value": f"owltriage {__version__}"}],
     }
     path.write_text(json.dumps(layer, indent=2), encoding="utf-8")
     return path

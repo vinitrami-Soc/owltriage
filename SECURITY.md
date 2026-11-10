@@ -1,6 +1,6 @@
 # Security policy
 
-bluetriage parses attacker-controlled input (logs, event exports, alerts), so we take
+owltriage parses attacker-controlled input (logs, event exports, alerts), so we take
 parser and output-handling bugs seriously.
 
 ## Reporting a vulnerability

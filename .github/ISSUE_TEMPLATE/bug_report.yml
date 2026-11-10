@@ -4,12 +4,12 @@ labels: ["bug"]
 body:
   - type: markdown
     attributes:
-      value: "Security vulnerability in bluetriage itself? Please follow SECURITY.md instead of opening a public issue."
+      value: "Security vulnerability in owltriage itself? Please follow SECURITY.md instead of opening a public issue."
   - type: input
     id: command
     attributes:
       label: Command you ran
-      placeholder: bluetriage hunt Security.evtx --window 300
+      placeholder: owltriage hunt Security.evtx --window 300
     validations:
       required: true
   - type: textarea
@@ -26,7 +26,7 @@ body:
   - type: input
     id: env
     attributes:
-      label: bluetriage version, Python version, OS
-      placeholder: bluetriage 2.0.0, Python 3.12, Ubuntu 24.04
+      label: owltriage version, Python version, OS
+      placeholder: owltriage 2.0.0, Python 3.12, Ubuntu 24.04
     validations:
       required: true

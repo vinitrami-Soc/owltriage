@@ -1,13 +1,13 @@
 # Writing detection rules
 
-Every detection in bluetriage is a YAML rule in [`bluetriage/rules/`](../bluetriage/rules/).
+Every detection in owltriage is a YAML rule in [`owltriage/rules/`](../owltriage/rules/).
 You can add rules **without writing Python**, and every rule carries its own tests.
 
 ```bash
-bluetriage rules list                 # what is loaded (add --type event, web, ...)
-bluetriage rules test                 # run every rule's examples
-bluetriage rules test my-new-rule     # just yours
-bluetriage hunt logs/ --rules-dir ./my-rules     # use your own rules directory
+owltriage rules list                 # what is loaded (add --type event, web, ...)
+owltriage rules test                 # run every rule's examples
+owltriage rules test my-new-rule     # just yours
+owltriage hunt logs/ --rules-dir ./my-rules     # use your own rules directory
 ```
 
 ## Anatomy of a rule
@@ -72,7 +72,7 @@ keys in Winlogbeat JSON). Test samples are mappings with `event_id`, optional `p
 
 ### Correlation rules
 
-The six built-ins live in [`correlation.yml`](../bluetriage/rules/correlation.yml). Their
+The six built-ins live in [`correlation.yml`](../owltriage/rules/correlation.yml). Their
 logic is in `detectors.py`; their numbers are yours to tune:
 
 | id | tunable keys |
@@ -109,7 +109,7 @@ Files in `--rules-dir` are merged on top of the packaged rules. If an `id` alrea
 1. At least one `match` **and** one `no_match` example. The `no_match` should be a realistic
    benign look-alike (`/blog/union-station-review` for a `UNION SELECT` rule).
 2. Every ATT&CK ID exists in `resources/attack.yml` (add new ones with their official name).
-3. The regex compiles and the rule passes `bluetriage rules test`.
+3. The regex compiles and the rule passes `owltriage rules test`.
 4. No unknown keys (a typo like `patern:` is an error, not silently ignored).
 5. **Bounded quantifiers.** Rules only ever see the first 8 KB of input, but write
    `.{0,200}` instead of `.*` between keywords and avoid nested quantifiers like `(a+)+`,

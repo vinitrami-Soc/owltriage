@@ -1,4 +1,4 @@
-# Free IP threat feeds used by `bluetriage update-feeds`.
+# Free IP threat feeds used by `owltriage update-feeds`.
 # Each provider has its own terms of use: read them (homepage) before using a
 # feed commercially. Add your own feeds in a file passed with --feeds-config.
 #

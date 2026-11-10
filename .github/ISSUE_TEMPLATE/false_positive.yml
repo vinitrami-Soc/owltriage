@@ -11,7 +11,7 @@ body:
     id: rule
     attributes:
       label: Rule id
-      description: From the report (`rule:` line) or `bluetriage rules list`
+      description: From the report (`rule:` line) or `owltriage rules list`
       placeholder: web-sqli-tautology
     validations:
       required: true
@@ -31,5 +31,5 @@ body:
   - type: input
     id: version
     attributes:
-      label: bluetriage version
-      placeholder: "bluetriage --version"
+      label: owltriage version
+      placeholder: "owltriage --version"

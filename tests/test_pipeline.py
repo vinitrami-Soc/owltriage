@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from bluetriage.config import Settings
-from bluetriage.enrichment import AbuseIPDBClient, RateLimiter, VirusTotalClient
-from bluetriage.pipeline import TriagePipeline, extract_observables, load_alerts
+from owltriage.config import Settings
+from owltriage.enrichment import AbuseIPDBClient, RateLimiter, VirusTotalClient
+from owltriage.pipeline import TriagePipeline, extract_observables, load_alerts
 
-DATA = Path(__file__).resolve().parent.parent / "bluetriage" / "resources" / "samples"
+DATA = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 EICAR = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
 
 
