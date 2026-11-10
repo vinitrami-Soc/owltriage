@@ -13,7 +13,7 @@ On the Wazuh manager:
 
 ```bash
 sudo python3 -m venv /opt/owltriage/venv
-sudo /opt/owltriage/venv/bin/pip install "git+https://github.com/your-username/owltriage"
+sudo /opt/owltriage/venv/bin/pip install "git+https://github.com/vinitrami-Soc/owltriage"
 sudo cp .env.example /opt/owltriage/.env        # add VT_API_KEY, DISCORD_WEBHOOK_URL, ...
 sudo chown root:wazuh /opt/owltriage/.env && sudo chmod 640 /opt/owltriage/.env
 

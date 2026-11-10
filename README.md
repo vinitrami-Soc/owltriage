@@ -8,7 +8,7 @@ One command turns raw Linux, web and Windows logs into an **owl's summary of wha
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Rules](https://img.shields.io/badge/rules-59-orange) ![ATT%26CK](https://img.shields.io/badge/ATT%26CK-36%20techniques-red) ![Tests](https://img.shields.io/badge/tests-pytest%20%2B%20real%20EVTX%20regression-brightgreen) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ```bash
-pip install "owltriage[evtx] @ git+https://github.com/your-username/owltriage"
+pip install "owltriage[evtx] @ git+https://github.com/vinitrami-Soc/owltriage"
 owltriage hunt --demo
 ```
 
