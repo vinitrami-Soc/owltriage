@@ -8,10 +8,14 @@ import tracemalloc
 from datetime import datetime, timezone
 from pathlib import Path
 
-from owltriage.detectors import analyze
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from owltriage.detectors import Analyzer, analyze
 from owltriage.intel import BadIPList
 from owltriage.log_parser import iter_text_events
 from owltriage.pipeline import TriageReport, extract_observables, load_alerts
+from owltriage.rules import load_rules
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "owltriage" / "resources" / "samples"
@@ -154,3 +158,42 @@ def test_brute_force_across_midnight_on_new_year(tmp_path):
     log.write_text("".join(failed(f"Dec 31 23:59:5{i}") for i in range(3))
                    + "".join(failed(f"Jan  1 00:00:0{i}") for i in range(3)), encoding="utf-8")
     assert "auth-brute-force" in [f.rule_id for f in analyze([log], window_seconds=600, year=2025).findings]
+
+
+# Property: the brute-force window is exact for time-ordered events and never over-counts otherwise
+RULES = load_rules()
+failure_stream = st.lists(st.tuples(st.integers(0, 4000), st.integers(1, 5)), min_size=1, max_size=60)
+
+
+def true_counts(events, window):
+    """Reference: for each failure, the failures seen so far (itself included) in [t - window, t]."""
+    return [sum(c for t2, c in events[:k + 1] if t - window <= t2 <= t) for k, (t, _) in enumerate(events)]
+
+
+@settings(max_examples=400, deadline=None)
+@given(failure_stream, st.integers(1, 900))
+def test_window_count_is_exact_for_ordered_events(events, window):
+    events = sorted(events, key=lambda e: e[0])
+    analyzer = Analyzer(ruleset=RULES, window_seconds=window)
+    got = [analyzer._add_failures("x", float(t), c) for t, c in events]
+    assert got == true_counts(events, window)
+
+
+@settings(max_examples=400, deadline=None)
+@given(failure_stream, st.integers(1, 900))
+def test_window_count_never_over_counts_in_any_order(events, window):
+    analyzer = Analyzer(ruleset=RULES, window_seconds=window)
+    for (t, c), truth in zip(events, true_counts(events, window)):
+        got = analyzer._add_failures("x", float(t), c)
+        assert c <= got <= truth                                   # a false positive needs got > truth
+        assert analyzer._recent_failures("x", float(t)) <= truth
+
+
+def test_progress_bar_follows_a_gzip_log(tmp_path):
+    lines = "".join(failed(f"Nov 12 10:{i // 60 % 60:02d}:{i % 60:02d}", f"203.0.113.{i % 50}") for i in range(20000))
+    packed = tmp_path / "auth.log.2.gz"
+    packed.write_bytes(gzip.compress(lines.encode()))                      # compresses about 20x
+    seen = []
+    analyze([packed], year=2026, on_progress=lambda p: seen.append((p.events, p.fraction)))
+    halfway = next(fraction for events, fraction in seen if events >= 10000)
+    assert 0.3 < halfway < 0.7, f"bar shows {halfway:.0%} at half the events"

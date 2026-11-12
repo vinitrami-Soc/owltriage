@@ -199,6 +199,17 @@ def open_log(path) -> IO[str]:
     return path.open("r", encoding="utf-8", errors="replace")
 
 
+def content_size(path) -> int:
+    """Bytes a reader will see, for the progress bar: a .gz file's uncompressed size (from its trailer)."""
+    path = Path(path)
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        if size < 18 or handle.read(2) != GZIP_MAGIC:
+            return size
+        handle.seek(-4, 2)
+        return max(size, int.from_bytes(handle.read(4), "little"))  # ISIZE: size mod 4 GiB, fine for a bar
+
+
 def iter_text_events(path, year: Optional[int] = None) -> Iterator[LogEvent]:
     """Yield one `LogEvent` per non-empty line without loading the whole file."""
     from .windows import SourceError  # windows.py imports this module

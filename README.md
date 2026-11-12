@@ -122,6 +122,7 @@ It is not a SIEM, an EDR or an auto-blocker. It reads the logs you give it and t
 | I want to... | Command |
 |---|---|
 | Triage a Linux server | `owltriage hunt /var/log/auth.log /var/log/nginx/access.log` |
+| Include the rotated, compressed logs | `owltriage hunt /var/log/auth.log*` (reads `auth.log.2.gz` as well) |
 | Triage Windows event logs | `owltriage hunt Security.evtx System.evtx` |
 | Ignore my own VPN and scanners | `owltriage hunt auth.log --allow 10.0.0.0/8 --allow 198.51.100.7` |
 | Make brute-force detection stricter or looser | `owltriage hunt auth.log --threshold 10 --window 300` |
@@ -141,7 +142,7 @@ It is not a SIEM, an EDR or an auto-blocker. It reads the logs you give it and t
 
 ## What it reads
 
-The format is detected from the file content, so you can mix sources in one run.
+The format is detected from the file content, so you can mix sources in one run. Rotated `.gz` logs are read as they are.
 
 | Source | Formats | Examples of what it catches |
 |---|---|---|

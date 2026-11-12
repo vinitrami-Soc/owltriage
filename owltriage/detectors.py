@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from .intel import BadIPList
-from .log_parser import LogEvent, extract_ips
+from .log_parser import LogEvent, content_size, extract_ips
 from .rules import Rule, RuleSet, load_rules, render_template
 from .sources import detect_format, iter_events
 from .timeutil import iso_utc
@@ -220,7 +220,7 @@ class Analyzer:
                   on_progress: Optional[Callable[[ScanProgress], None]] = None,
                   file_no: int = 1, files: int = 1, done_bytes: int = 0, total_bytes: int = 0) -> None:
         self.result.files.append(str(path))
-        size = Path(path).stat().st_size if on_progress else 0
+        size = content_size(path) if on_progress else 0
         total = max(total_bytes or size, 1)
         # Bytes per event for formats whose events don't map 1:1 to text lines (rough, only for the bar).
         per_event = {"evtx": 900, "windows-xml": 1100}.get(detect_format(path), 0) if on_progress else 0
@@ -475,7 +475,7 @@ def analyze(paths: Iterable, bad_ips: Optional[BadIPList] = None, brute_threshol
             on_progress: Optional[Callable[[ScanProgress], None]] = None) -> AnalysisResult:
     analyzer = Analyzer(bad_ips, brute_threshold, ruleset, window_seconds)
     paths = list(paths)
-    sizes = [Path(p).stat().st_size for p in paths] if on_progress else [0] * len(paths)
+    sizes = [content_size(p) for p in paths] if on_progress else [0] * len(paths)
     done = 0
     for number, (path, size) in enumerate(zip(paths, sizes), 1):
         analyzer.scan_file(path, year, on_progress, number, len(paths), done, sum(sizes))

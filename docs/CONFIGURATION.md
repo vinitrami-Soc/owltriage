@@ -50,6 +50,9 @@ owltriage hunt /var/log/auth.log /var/log/nginx/access.log Security.evtx
 | Windows XML | `wevtutil qe Security /f:xml > security.xml` (UTF-8 or UTF-16) |
 | JSON lines | Winlogbeat / Elastic (`winlog.*`) or flat events with `EventID`; non-Windows lines are read as text |
 
+Rotated logs compressed by logrotate (`auth.log.2.gz`) are read as they are, so `owltriage hunt /var/log/auth.log*`
+covers the older days too. Files can be given in any order; a syslog file that crosses New Year is handled.
+
 | Flag | Default | What it does |
 |---|---|---|
 | `LOGS...` | none | Log files to scan. |
@@ -58,8 +61,8 @@ owltriage hunt /var/log/auth.log /var/log/nginx/access.log Security.evtx
 | `--feeds-dir DIR` | `~/.cache/owltriage/feeds` | Where downloaded threat feeds are read from (see [environment variables](#environment-variables)). |
 | `--no-feeds` | off | Don't load downloaded threat feeds for this run. |
 | `--rules-dir DIR` | none | Extra YAML rules, or overrides of built-in rules by `id`. Repeatable. |
-| `--threshold N` | `5` (from the rule) | Failed logins from one IP that count as brute force. Overrides the `auth-brute-force` rule for this run. |
-| `--window SECONDS` | `600` (from the rule) | Time window for the threshold. `0` counts across the whole file. |
+| `--threshold N` | `5` (from the rule) | Failed logins from one IP that count as brute force (1 or more). Overrides the `auth-brute-force` rule for this run. |
+| `--window SECONDS` | `600` (from the rule) | Time window for the threshold (0 or more). `0` counts across the whole file. |
 | `--year YYYY` | current year | Year to assume for syslog timestamps, which have none. Set it when hunting last year's logs. |
 | `--allow IP_OR_CIDR` | none | Never write a block rule for this address or range (your VPN, office, scanners you run). Repeatable. |
 | `--fail-on SEVERITY` | off | Exit with code `1` if any finding is at least `low`, `medium`, `high` or `critical`. For cron and CI. |

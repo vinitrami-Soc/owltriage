@@ -36,6 +36,7 @@ version, and when an external service misbehaves.
 | The owl & the summary | `test_banner_summary.py` | Animation only on an interactive terminal (off for pipes, CI, `--quiet`, `--no-anim`, tiny terminals); every frame of the story with a fake clock (branch → bar → walks with progress → looks around when stalled → home), constant frame height, ≤ 1.5 s budget, compact mode adds no time; a **real PTY run** checks the animation and its cost; the owl's summary tells the right stories and next steps; piped output has no colors or big logo |
 | Real attacks | `test_real_evtx.py` | ~280 EVTX-ATTACK-SAMPLES files parse without crashing; 12 known attacks stay detected |
 | Performance | `test_performance.py` | 100k lines well under the limit; memory does not grow with file size |
+| Pre-release review fixes | `test_review_fixes.py` | One regression test per review finding (gzip logs, file order, repeated-message memory, New Year, BOMs, malformed alerts, flag limits, IPv6, gzip progress); Hypothesis proves the brute-force window is exact for ordered events and never over-counts in any order |
 
 Python 3.9 (oldest supported) and 3.13 were both run locally with the full suite and the
 real-EVTX regression. CI covers 3.9-3.13 on Linux plus Windows and macOS.
@@ -85,6 +86,33 @@ Bugs are injected into security-critical code one at a time; each must make the 
 | Obfuscated `IEX(... [char]0x53 ...)` payloads were only "low" | Real samples | New obfuscated-IEX rule (high) |
 | Throughput dropped with 4× more rules | Profiling | Cached timestamp parsing: about +20 % |
 | Docker: `docker run -v "$PWD:/work"` crashed with a PermissionError traceback for normal users | Building and running the image | Docs use `--user`; unreadable logs and a read-only `--out-dir` exit 2 with a hint |
+
+## Pre-release round (v2.0.0)
+
+A last round before the release, using a risk-based gap analysis, a full code review and
+long dynamic runs instead of more line coverage.
+
+| Method | Result |
+|---|---|
+| Branch coverage, CLI subprocesses included | 95 % (cli.py 91 %); the remaining lines are defensive branches |
+| Input-class probing (BOM, CRLF, `.gz`, empty files, odd flag values, non-object alerts) | 6 defects, all fixed |
+| Code review of the whole package | 10 findings, all reproduced first and fixed test-first |
+| Long fuzzing: 6 targets x 4,000 Hypothesis examples (hostile log lines, random bytes as `.gz`/EVTX/XML/JSON, arbitrary alert JSON through the whole pipeline) | No crash, no invalid IP ever extracted |
+| All 278 EVTX-ATTACK-SAMPLES and the demo, before vs after the fixes | Identical findings (82 and 32) |
+| Throughput before vs after | Text about 6 % slower (25.8k vs 24.3k lines/s on 200k mixed lines), EVTX unchanged (about 7.5k records/s), same findings |
+| Real PTY run on a 18 MB log packed into `.gz` | Full animation; the bar climbs smoothly instead of jumping to 98 % |
+
+| Bug | Found by | Impact |
+|---|---|---|
+| Rotated `.gz` logs gave 0 findings and exit 0 | Input-class probing | `hunt /var/log/auth.log*` silently skipped older days |
+| Files read newest-first shared one brute-force window | Code review | False brute force and false "login after brute force" |
+| "message repeated N times" stored N timestamps | Code review | A 244 KB crafted log took 1.6 GB (now 35 MB) |
+| Year-less syslog crossing New Year went back a year | Code review | Brute force across midnight missed |
+| UTF-8 BOM in alert files and blocklists | Input-class probing | Windows-saved files rejected, or the first blocklist IP lost |
+| Non-object NDJSON alerts, `Infinity` rule level | Input-class probing, code review | Traceback instead of a message |
+| `--threshold 0`, negative `--window` | Input-class probing | Silently clamped |
+| IPv6 only in `full_log` | Code review | Never enriched |
+| Progress bar used the compressed size of `.gz` logs | PTY run | Bar stuck at 98 % for most of the hunt |
 
 ## Known gaps
 
