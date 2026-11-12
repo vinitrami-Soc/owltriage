@@ -39,14 +39,14 @@ def test_repeated_message_lines_use_constant_memory(tmp_path):
     log = tmp_path / "auth.log"
     line = ("Nov 12 10:00:01 server sshd[1]: message repeated 100000 times: "
             f"[ Failed password for root from {ATTACKER} port 4242 ssh2]\n")
-    log.write_text(line * 300, encoding="utf-8")
+    log.write_text(line * 20, encoding="utf-8")
     tracemalloc.start()
     result = analyze([log], window_seconds=600, year=2026)
     peak = tracemalloc.get_traced_memory()[1]
     tracemalloc.stop()
-    assert result.failed_by_ip[ATTACKER] == 300 * 100_000
+    assert result.failed_by_ip[ATTACKER] == 20 * 100_000
     assert "auth-brute-force" in [f.rule_id for f in result.findings]
-    assert peak < 30_000_000, f"peak {peak / 1e6:.0f} MB"   # was ~240 MB for these 37 KB
+    assert peak < 30_000_000, f"peak {peak / 1e6:.0f} MB"   # 2.5 KB of log used to cost hundreds of MB
 
 
 # 2. events from an older file processed after a newer one must not share a window
@@ -81,6 +81,17 @@ def test_gzip_rotated_log_gives_the_same_findings(tmp_path):
     packed.write_bytes(gzip.compress(plain.read_bytes()))
     expected = sorted(f.rule_id for f in analyze([plain], year=2026).findings)
     assert expected and sorted(f.rule_id for f in analyze([packed], year=2026).findings) == expected
+
+
+def test_gzip_winlogbeat_json_is_read_as_windows_events(tmp_path):
+    lines = [json.dumps({"@timestamp": f"2026-11-09T04:00:0{s}Z", "winlog": {
+        "event_id": 4625, "channel": "Security", "provider_name": "Microsoft-Windows-Security-Auditing",
+        "event_data": {"TargetUserName": "svc", "IpAddress": "198.51.100.9", "LogonType": "3"}}}) for s in range(6)]
+    packed = tmp_path / "winlogbeat.ndjson.gz"
+    packed.write_bytes(gzip.compress(("\n".join(lines) + "\n").encode()))
+    result = analyze([packed], window_seconds=600)
+    assert result.log_types["windows"] == 6
+    assert "auth-brute-force" in [f.rule_id for f in result.findings]
 
 
 def test_truncated_gzip_is_a_warning_not_a_crash(tmp_path):

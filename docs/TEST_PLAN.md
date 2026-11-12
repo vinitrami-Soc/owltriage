@@ -98,8 +98,9 @@ long dynamic runs instead of more line coverage.
 | Input-class probing (BOM, CRLF, `.gz`, empty files, odd flag values, non-object alerts) | 6 defects, all fixed |
 | Code review of the whole package | 10 findings, all reproduced first and fixed test-first |
 | Long fuzzing: 6 targets x 4,000 Hypothesis examples (hostile log lines, random bytes as `.gz`/EVTX/XML/JSON, arbitrary alert JSON through the whole pipeline) | No crash, no invalid IP ever extracted |
+| Mutation testing, 45 injected bugs (25 earlier + 20 for this round's fixes) | 45/45 caught by a test assertion. Three needed work first: gzipped JSON lines had no test (added), the repeated-message memory test took 15 min to fail on the mutant (now 1 min, same limit), and the unreadable-log mutant is only caught as a non-root user, as in CI |
 | All 278 EVTX-ATTACK-SAMPLES and the demo, before vs after the fixes | Identical findings (82 and 32) |
-| Throughput before vs after | Text about 6 % slower (25.8k vs 24.3k lines/s on 200k mixed lines), EVTX unchanged (about 7.5k records/s), same findings |
+| Throughput before vs after (same machine, same load) | Text about 6 % slower (25.8k vs 24.3k lines/s on 200k mixed lines), EVTX unchanged, same findings. On an idle CPU: 26.7k text lines/s, 9.2k EVTX records/s |
 | Real PTY run on a 18 MB log packed into `.gz` | Full animation; the bar climbs smoothly instead of jumping to 98 % |
 
 | Bug | Found by | Impact |

@@ -302,7 +302,7 @@ flowchart LR
     P --> CH[Discord / Slack] & TH[TheHive]
 ```
 
-Logs are streamed, so memory stays flat on large files. On one core with all 59 rules it reads roughly 30,000
+Logs are streamed, so memory stays flat on large files. On one core with all 59 rules it reads roughly 25,000
 text log lines or 9,000 EVTX records per second.
 
 ---
