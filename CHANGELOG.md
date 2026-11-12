@@ -1,29 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Added
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md): every flag, `.env` setting, environment variable,
-  output file and exit code in one place, with recipes for cron, CI and air-gapped machines.
-- `owltriage update-feeds --quiet` prints only failures, to stderr, so cron mails you only when a feed fails.
-
-### Changed
-- README rewritten around a five-minute quick start, an "Everyday use" table and a docs index.
-- `.env.example` explains every setting and where to get each key.
-- `owltriage rules list` groups rules by type, fits an 80-column terminal, marks disabled rules,
-  and its count follows `--type`.
-- Clearer help text for `owltriage rules`, and `--help` links to the configuration reference.
-
-### Fixed
-- A log you can't read (e.g. `/var/log/auth.log` as a normal user), a folder passed instead of log files,
-  or an `--out-dir` you can't write to now stop with a one-line explanation and exit code 2 instead of
-  a Python traceback.
-- Docker instructions use `--user "$(id -u):$(id -g)"`; without it the container could not write the
-  report into your folder.
-- `--allow` with a bad value says what it expects (an IP or CIDR range, with examples).
-- ATT&CK badge: the rules cover 35 techniques, not 36.
-
-## 2.0.0
+## 2.0.0 (2026-11-12)
 
 Rebuilt for the wider blue team community, and renamed **OwlTriage**.
 
@@ -52,6 +29,11 @@ Rebuilt for the wider blue team community, and renamed **OwlTriage**.
   ATT&CK Navigator `attack_layer.json`; `alert_results.ndjson` audit trail for the alert pipeline.
 - `pip install`-able package with a `owltriage` command, `--demo`, `--quiet`, Dockerfile,
   Wazuh custom integration, CI on Linux/Windows/macOS and a regression job on real attack samples.
+- **Documentation**: a five-minute quick start in the README, and
+  [docs/CONFIGURATION.md](docs/CONFIGURATION.md) with every flag, `.env` setting, environment variable,
+  output file and exit code, plus recipes for cron, CI and air-gapped machines.
+- `owltriage update-feeds --quiet` for cron: failures only, on stderr.
+- `owltriage rules list` groups rules by type and marks disabled ones.
 
 ### Changed
 - Project renamed OwlTriage (package and command `owltriage`, was `triage`); `SSH_BRUTE_FORCE` → `BRUTE_FORCE` (also RDP/Kerberos).
@@ -59,6 +41,10 @@ Rebuilt for the wider blue team community, and renamed **OwlTriage**.
 
 ### Fixed
 - Malformed XML no longer aborts a whole hunt (reported as a warning).
+- Bad input stops with a one-line explanation and exit code 2 instead of a traceback: an unreadable
+  log, a folder instead of log files, an `--out-dir` you can't write to, or an invalid `--allow` value.
+- Docker instructions use `--user "$(id -u):$(id -g)"` so the container can write the report into
+  your folder.
 
 ## 1.0.0
 - First release: offline SSH/web log hunt and VirusTotal / AbuseIPDB / Discord / Slack / TheHive pipeline.
