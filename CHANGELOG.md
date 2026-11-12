@@ -54,6 +54,3 @@ Rebuilt for the wider blue team community, and renamed **OwlTriage**.
   NDJSON lines that are not objects and an `Infinity` rule level no longer crash the pipeline.
 - IPv6 addresses in an alert's `full_log` are enriched; `--threshold` below 1 and a negative
   `--window` are refused.
-
-## 1.0.0
-- First release: offline SSH/web log hunt and VirusTotal / AbuseIPDB / Discord / Slack / TheHive pipeline.
