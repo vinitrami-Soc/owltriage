@@ -248,18 +248,18 @@ def test_summary_of_a_clean_log_is_empty(tmp_path):
 def test_summary_is_in_every_report(tmp_path):
     env = {**os.environ, "PYTHONPATH": str(ROOT), "OWLTRIAGE_FEEDS_DIR": str(tmp_path / "none")}
     run = subprocess.run([sys.executable, "-m", "owltriage", "hunt", "--demo", "--out-dir", str(tmp_path)],
-                         capture_output=True, text=True, env=env, timeout=120)
+                         capture_output=True, text=True, encoding="utf-8", env=env, timeout=120)
     assert run.returncode == 0
     assert "The owl's summary" in run.stdout and "What to do next" in run.stdout
     assert "\x1b[" not in run.stdout and "██████╗" not in run.stdout   # piped: no colours, no big logo
     text = (tmp_path / "triage_report.txt").read_text(encoding="utf-8")
     assert "THE OWL'S SUMMARY" in text and "Reset passwords" in text
     import json
-    data = json.loads((tmp_path / "triage_report.json").read_text())
+    data = json.loads((tmp_path / "triage_report.json").read_text(encoding="utf-8"))
     assert data["summary"]["stories"][0]["severity"] == "critical" and data["summary"]["next_steps"]
 
 
 def test_bare_command_shows_usage():
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
-    run = subprocess.run([sys.executable, "-m", "owltriage"], capture_output=True, text=True, env=env, timeout=60)
+    run = subprocess.run([sys.executable, "-m", "owltriage"], capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
     assert run.returncode == 0 and "usage: owltriage" in run.stdout

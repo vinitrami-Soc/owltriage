@@ -149,8 +149,8 @@ def demo_result():
 
 def test_stix_bundle_is_valid_and_deterministic(demo_result, tmp_path):
     result, _ = demo_result
-    first = json.loads(write_stix_bundle(result, tmp_path / "a.json").read_text())
-    second = json.loads(write_stix_bundle(result, tmp_path / "b.json").read_text())
+    first = json.loads(write_stix_bundle(result, tmp_path / "a.json").read_text(encoding="utf-8"))
+    second = json.loads(write_stix_bundle(result, tmp_path / "b.json").read_text(encoding="utf-8"))
     ids = lambda b: sorted(o["id"] for o in b["objects"] if o["type"] == "indicator")  # noqa: E731
     assert ids(first) == ids(second) and len(ids(first)) == 7
     stix2 = pytest.importorskip("stix2")
@@ -159,7 +159,7 @@ def test_stix_bundle_is_valid_and_deterministic(demo_result, tmp_path):
 
 def test_attack_navigator_layer(demo_result, tmp_path):
     result, ruleset = demo_result
-    layer = json.loads(write_attack_layer(result, ruleset, tmp_path / "layer.json").read_text())
+    layer = json.loads(write_attack_layer(result, ruleset, tmp_path / "layer.json").read_text(encoding="utf-8"))
     assert layer["domain"] == "enterprise-attack" and layer["versions"]["layer"] == "4.5"
     ids = {t["techniqueID"] for t in layer["techniques"]}
     assert {"T1110.003", "T1490", "T1070.001", "T1059.001"} <= ids
@@ -168,7 +168,7 @@ def test_attack_navigator_layer(demo_result, tmp_path):
 
 def test_ndjson_is_ecs_shaped(demo_result, tmp_path):
     result, ruleset = demo_result
-    docs = [json.loads(line) for line in write_findings_ndjson(result, ruleset, tmp_path / "f.ndjson").read_text().splitlines()]
+    docs = [json.loads(line) for line in write_findings_ndjson(result, ruleset, tmp_path / "f.ndjson").read_text(encoding="utf-8").splitlines()]
     assert len(docs) == len(result.findings)
     compromise = next(d for d in docs if d["rule"]["name"] == "COMPROMISE_SUSPECTED")
     assert compromise["event"]["kind"] == "alert" and compromise["source"]["ip"]

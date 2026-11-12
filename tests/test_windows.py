@@ -52,7 +52,7 @@ def test_powershell_utf16_payload_is_decoded():
 
 def test_utf16_export_from_powershell_redirection(tmp_path):
     utf16 = tmp_path / "security-utf16.xml"
-    utf16.write_bytes(b"\xff\xfe" + ('<?xml version="1.0" encoding="UTF-16"?>\n' + WIN.read_text()).encode("utf-16-le"))
+    utf16.write_bytes(b"\xff\xfe" + ('<?xml version="1.0" encoding="UTF-16"?>\n' + WIN.read_text(encoding="utf-8")).encode("utf-16-le"))
     assert detect_format(utf16) == "windows-xml"
     assert len(list(iter_events(utf16))) == 17
 
@@ -73,7 +73,7 @@ def test_record_parser_refuses_entities_and_dtds():
 
 def test_truncated_xml_keeps_parsed_events_and_warns(tmp_path):
     cut = tmp_path / "cut.xml"
-    text = WIN.read_text()
+    text = WIN.read_text(encoding="utf-8")
     cut.write_text(text[: len(text) // 2])
     result = analyze([cut])
     assert 0 < result.lines_scanned < 17

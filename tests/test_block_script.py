@@ -51,7 +51,7 @@ EXPECTED = ["iptables INPUT -s 203.0.113.5 -j DROP",
 
 
 def run(script: Path, env):
-    return subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, timeout=30)
+    return subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
 
 
 def test_script_applies_each_rule_once_even_when_run_twice(tmp_path, fake_firewall):
@@ -61,22 +61,22 @@ def test_script_applies_each_rule_once_even_when_run_twice(tmp_path, fake_firewa
     first = run(script, env)
     assert first.returncode == 0, first.stderr
     assert "Applied 3 block rule(s)." in first.stdout
-    assert state.read_text().splitlines() == EXPECTED
+    assert state.read_text(encoding="utf-8").splitlines() == EXPECTED
 
     second = run(script, env)
     assert second.returncode == 0, second.stderr
-    assert state.read_text().splitlines() == EXPECTED  # no duplicates
+    assert state.read_text(encoding="utf-8").splitlines() == EXPECTED  # no duplicates
 
 
 def test_undo_commands_remove_the_rules(tmp_path, fake_firewall):
     env, state = fake_firewall
     script = write_script(RULES, tmp_path / "block_ips.sh")
     run(script, env)
-    undo = [line[2:] for line in script.read_text().splitlines() if line.startswith("# ip") and " -D " in line]
+    undo = [line[2:] for line in script.read_text(encoding="utf-8").splitlines() if line.startswith("# ip") and " -D " in line]
     undo_script = tmp_path / "undo.sh"
     undo_script.write_text("set -euo pipefail\n" + "\n".join(undo) + "\n")
     assert run(undo_script, env).returncode == 0
-    assert state.read_text() == ""
+    assert state.read_text(encoding="utf-8") == ""
 
 
 def test_script_stops_if_firewall_command_fails(tmp_path, fake_firewall):

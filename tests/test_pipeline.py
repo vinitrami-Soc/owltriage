@@ -73,10 +73,10 @@ def test_mock_pipeline_escalates_malicious_alert(tmp_path):
     assert [(a, s) for a, s, _ in report.actions] == [
         ("Discord webhook", "dry-run"), ("Slack webhook", "dry-run"), ("TheHive case", "dry-run")]
 
-    discord = json.loads(next(tmp_path.glob("dry_run/discord_*.json")).read_text())
+    discord = json.loads(next(tmp_path.glob("dry_run/discord_*.json")).read_text(encoding="utf-8"))
     assert discord["allowed_mentions"] == {"parse": []}
     assert len(discord["embeds"][0]["fields"]) <= 25
-    case = json.loads(next(tmp_path.glob("dry_run/thehive_*.json")).read_text())
+    case = json.loads(next(tmp_path.glob("dry_run/thehive_*.json")).read_text(encoding="utf-8"))
     assert case["case"]["severity"] == 4
     assert {o["data"] for o in case["observables"]} == {"203.0.113.5", EICAR}
 

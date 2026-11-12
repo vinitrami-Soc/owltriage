@@ -19,7 +19,7 @@ def cli(*args, cwd=None, feeds_dir=None):
     env["COLUMNS"] = "200"
     env["PYTHONPATH"] = str(ROOT)
     env["OWLTRIAGE_FEEDS_DIR"] = str(feeds_dir or ROOT / "tests" / "no-feeds-here")
-    return subprocess.run([sys.executable, "-m", "owltriage", *map(str, args)], capture_output=True, text=True,
+    return subprocess.run([sys.executable, "-m", "owltriage", *map(str, args)], capture_output=True, text=True, encoding="utf-8",
                           cwd=cwd or ROOT, env=env, timeout=120)
 
 
@@ -31,11 +31,11 @@ def test_demo_hunt_writes_every_output(tmp_path):
     for name in ("triage_report.txt", "triage_report.json", "findings.ndjson", "iocs.csv", "iocs.stix.json",
                  "attack_layer.json", "block_ips.sh"):
         assert (tmp_path / name).is_file(), name
-    report = json.loads((tmp_path / "triage_report.json").read_text())
+    report = json.loads((tmp_path / "triage_report.json").read_text(encoding="utf-8"))
     assert report["stats"]["log_types"] == {"text": 34, "web": 14, "windows": 17}
     if shutil.which("bash") and sys.platform != "win32":
         assert subprocess.run(["bash", "-n", str(tmp_path / "block_ips.sh")]).returncode == 0
-    ndjson = [json.loads(line) for line in (tmp_path / "findings.ndjson").read_text().splitlines()]
+    ndjson = [json.loads(line) for line in (tmp_path / "findings.ndjson").read_text(encoding="utf-8").splitlines()]
     assert len(ndjson) == len(report["findings"])
 
 
@@ -64,7 +64,7 @@ def test_clean_log_produces_no_block_script(tmp_path):
 def test_allow_keeps_admin_range_out_of_block_script(tmp_path):
     run = cli("hunt", "--demo", "--out-dir", tmp_path, "--allow", "203.0.113.0/24")
     assert run.returncode == 0
-    script = (tmp_path / "block_ips.sh").read_text()
+    script = (tmp_path / "block_ips.sh").read_text(encoding="utf-8")
     assert "203.0.113." not in script.split("# ---- Undo")[0]
     assert "198.51.100.23" in script
     assert "allowlisted" in run.stdout
@@ -111,7 +111,7 @@ def test_user_rule_override_and_custom_rule(tmp_path):
         "  mitre: [T1595.003]\n  pattern: '^/admin/'\n  tests:\n    match: ['/admin/dashboard']\n")
     run = cli("hunt", "--demo", "--rules-dir", rules, "--out-dir", tmp_path)
     assert run.returncode == 0, run.stderr
-    findings = json.loads((tmp_path / "triage_report.json").read_text())["findings"]
+    findings = json.loads((tmp_path / "triage_report.json").read_text(encoding="utf-8"))["findings"]
     ids = {f["rule_id"] for f in findings}
     assert "web-admin-probe" in ids and "web-xss" not in ids
 
@@ -156,7 +156,7 @@ def test_cached_feeds_are_loaded_and_reported(tmp_path):
     assert run.returncode == 0
     assert "test-feed (1)" in run.stdout
     assert "stale" in run.stdout
-    assert "feed: test-feed" in (tmp_path / "out" / "triage_report.txt").read_text()
+    assert "feed: test-feed" in (tmp_path / "out" / "triage_report.txt").read_text(encoding="utf-8")
 
 
 def test_alert_demo_saves_payloads_and_audit_log(tmp_path):
@@ -164,18 +164,18 @@ def test_alert_demo_saves_payloads_and_audit_log(tmp_path):
     assert run.returncode == 0, run.stderr
     assert "CRITICAL" in run.stdout
     assert len(list((tmp_path / "dry_run").glob("*.json"))) == 3
-    audit = json.loads((tmp_path / "alert_results.ndjson").read_text().splitlines()[0])
+    audit = json.loads((tmp_path / "alert_results.ndjson").read_text(encoding="utf-8").splitlines()[0])
     assert audit["severity"] == "critical" and audit["escalated"] is True and audit["mitre"] == ["T1105"]
 
 
 def test_alert_ndjson_with_two_alerts(tmp_path):
-    lines = [(SAMPLES / name).read_text().replace("\n", " ") for name in ("dummy_alert.json", "benign_alert.json")]
+    lines = [(SAMPLES / name).read_text(encoding="utf-8").replace("\n", " ") for name in ("dummy_alert.json", "benign_alert.json")]
     ndjson = tmp_path / "alerts.json"
     ndjson.write_text("\n".join(lines) + "\n")
     run = cli("alert", ndjson, "--mock", "--dry-run", "--out-dir", tmp_path)
     assert run.returncode == 0
     assert run.stdout.count("alert enrichment") == 2
-    assert len((tmp_path / "alert_results.ndjson").read_text().splitlines()) == 2
+    assert len((tmp_path / "alert_results.ndjson").read_text(encoding="utf-8").splitlines()) == 2
 
 
 def test_alert_without_keys_warns_and_skips(tmp_path):
@@ -194,14 +194,14 @@ def test_works_from_any_directory(tmp_path):
 def test_main_py_shim_still_works(tmp_path):
     env = {**os.environ, "OWLTRIAGE_FEEDS_DIR": str(tmp_path / "none")}
     run = subprocess.run([sys.executable, str(ROOT / "main.py"), "hunt", "--demo", "--quiet", "--out-dir",
-                          str(tmp_path)], capture_output=True, text=True, env=env, timeout=120)
+                          str(tmp_path)], capture_output=True, text=True, encoding="utf-8", env=env, timeout=120)
     assert run.returncode == 0, run.stderr
 
 
 def test_svg_screenshot(tmp_path):
     svg = tmp_path / "shot.svg"
     assert cli("hunt", "--demo", "--out-dir", tmp_path, "--svg", svg).returncode == 0
-    assert svg.read_text().startswith("<svg")
+    assert svg.read_text(encoding="utf-8").startswith("<svg")
 
 
 def test_legacy_console_encoding_does_not_crash(tmp_path):

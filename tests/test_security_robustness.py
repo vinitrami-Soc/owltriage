@@ -62,7 +62,7 @@ def test_hostile_log_content_cannot_control_the_terminal():
 
 def test_hostile_usernames_cannot_forge_report_lines(tmp_path):
     result = analyze_lines(HOSTILE)
-    text = write_text_report(result, [], [], tmp_path / "r.txt").read_text()
+    text = write_text_report(result, [], [], tmp_path / "r.txt").read_text(encoding="utf-8")
     assert "\x1b" not in text and "\r" not in text and "\u202e" not in text
     assert all(not line.startswith("[CRITICAL]") for line in text.splitlines())
 

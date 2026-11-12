@@ -38,7 +38,7 @@ def test_sample_story_is_fully_detected(sample):
 
 def test_text_report_counts_match(sample, tmp_path):
     result, rules, skipped = sample
-    text = write_text_report(result, rules, skipped, tmp_path / "r.txt").read_text()
+    text = write_text_report(result, rules, skipped, tmp_path / "r.txt").read_text(encoding="utf-8")
     assert "Attacks / findings detected : 21" in text
     assert "critical 2, high 15, medium 3, low 1" in text
     assert "Malicious IPs               : 5" in text
@@ -47,7 +47,7 @@ def test_text_report_counts_match(sample, tmp_path):
 
 def test_json_report_is_machine_readable(sample, tmp_path):
     result, rules, _ = sample
-    data = json.loads(write_json_report(result, rules, tmp_path / "r.json").read_text())
+    data = json.loads(write_json_report(result, rules, tmp_path / "r.json").read_text(encoding="utf-8"))
     assert data["stats"]["failed_logins"] == 15
     assert {"rule", "severity", "ip", "evidence"} <= set(data["findings"][0])
     assert data["block_rules"][0]["command"].startswith("iptables -A")

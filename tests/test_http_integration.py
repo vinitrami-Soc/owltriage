@@ -19,7 +19,7 @@ from owltriage.pipeline import TriagePipeline, load_alerts
 
 DATA = Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "samples"
 EICAR = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
-MOCK = json.loads((Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "mock_intel.json").read_text())
+MOCK = json.loads((Path(__file__).resolve().parent.parent / "owltriage" / "resources" / "mock_intel.json").read_text(encoding="utf-8"))
 
 
 class FakeSOC:
