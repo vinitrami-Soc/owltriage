@@ -212,9 +212,9 @@ and its own test cases:
 ```
 
 ```bash
-owltriage rules list                            # what is loaded, grouped by type
-owltriage rules test                            # run all 160+ examples (CI does this on every change)
-owltriage hunt logs/*.log --rules-dir ./my-rules     # add rules, or tune and disable built-ins by id
+owltriage rules list                              # what is loaded, by type
+owltriage rules test                              # run all 160+ examples
+owltriage hunt logs/*.log --rules-dir ./my-rules  # add, tune or disable rules
 ```
 
 Tune built-in rules without forking. Put this in `my-rules/tuning.yml`:
@@ -237,8 +237,8 @@ are in [docs/RULES.md](docs/RULES.md).
 Feeds are optional. They are free IP blocklists that let a hunt flag known-bad infrastructure.
 
 ```bash
-owltriage update-feeds          # IPsum, abuse.ch Feodo Tracker, blocklist.de, Emerging Threats
-owltriage update-feeds --list   # what is configured and how old the cache is
+owltriage update-feeds          # IPsum, Feodo Tracker, blocklist.de, Emerging Threats
+owltriage update-feeds --list   # what is configured, and how old the cache is
 ```
 
 Feeds are cached in `~/.cache/owltriage/feeds` and every `hunt` loads them, so the hunt itself stays
@@ -255,10 +255,17 @@ Wazuh alert → VirusTotal / AbuseIPDB → Discord / Slack → TheHive.
 ![owltriage alert --demo](docs/alert.png)
 
 ```bash
-owltriage alert --demo                                         # sample alert, fake answers, nothing sent
-cp .env.example .env                                           # add your keys and webhooks
-owltriage alert /var/ossec/logs/alerts/alerts.json --dry-run   # real lookups, payloads saved, nothing sent
-owltriage alert /var/ossec/logs/alerts/alerts.json             # live
+# Try it: a sample alert, fake API answers, nothing sent
+owltriage alert --demo
+
+# Add your keys and webhooks
+cp .env.example .env
+
+# Real lookups; the messages are saved to owltriage-output/dry_run/, not sent
+owltriage alert /var/ossec/logs/alerts/alerts.json --dry-run
+
+# Live
+owltriage alert /var/ossec/logs/alerts/alerts.json
 ```
 
 OwlTriage takes the attacker IP and the strongest file hash from each alert and looks them up within the

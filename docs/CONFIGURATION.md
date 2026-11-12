@@ -76,7 +76,7 @@ owltriage hunt /var/log/auth.log /var/log/nginx/access.log Security.evtx
 score crosses the threshold, it sends a Discord/Slack message and opens a TheHive case.
 
 ```bash
-owltriage alert --demo                                     # sample alert, fake answers, nothing sent
+owltriage alert --demo        # sample alert, fake answers, nothing sent
 owltriage alert /var/ossec/logs/alerts/alerts.json --dry-run
 ```
 
@@ -117,10 +117,10 @@ Private addresses are never sent to external APIs: `10.0.0.0/8`, `172.16.0.0/12`
 ## `owltriage rules`
 
 ```bash
-owltriage rules list                       # every rule, grouped by type, with ATT&CK ids; disabled ones are marked
-owltriage rules list --type event          # only one type: web, command, line, event, correlation
-owltriage rules test                       # run every rule's match / no_match examples
-owltriage rules test web-xss cmd-lsass-dump
+owltriage rules list                         # every rule by type, disabled ones marked
+owltriage rules list --type event             # web, command, line, event or correlation
+owltriage rules test                          # run every rule's match / no_match examples
+owltriage rules test web-xss cmd-lsass-dump   # only these rules
 owltriage rules test --rules-dir ./my-rules   # include your own rules
 ```
 
@@ -131,9 +131,9 @@ owltriage rules test --rules-dir ./my-rules   # include your own rules
 ## `owltriage update-feeds`
 
 ```bash
-owltriage update-feeds                      # download every enabled feed
-owltriage update-feeds --list               # what is configured, how many entries are cached, how old
-owltriage update-feeds --only feodo-tracker # one feed (also works for feeds disabled by default)
+owltriage update-feeds                       # download every enabled feed
+owltriage update-feeds --list                # feeds, cached entries, cache age
+owltriage update-feeds --only feodo-tracker  # one feed, even a disabled one
 owltriage update-feeds --feeds-config my-feeds.yml --feeds-dir /var/lib/owltriage/feeds
 ```
 
@@ -299,11 +299,29 @@ or redirected output.
 
 ## Recipes
 
-**Hunt every 15 minutes and fail loudly on serious findings** (`/etc/cron.d/owltriage`):
+**Hunt every 15 minutes and log serious findings to syslog.** First a small script,
+`/usr/local/bin/owltriage-cron` (make it executable with `chmod 755`):
+
+```sh
+#!/bin/sh
+# Hunt, then tell syslog about high or critical findings, or about a failed run.
+OUT=/var/lib/owltriage/latest
+owltriage hunt /var/log/auth.log /var/log/nginx/access.log \
+    --out-dir "$OUT" --allow 10.0.0.0/8 --fail-on high --quiet
+case $? in
+    1) logger -t owltriage "high-severity findings, see $OUT/triage_report.txt" ;;
+    2) logger -t owltriage -p user.err "hunt failed, run it by hand to see why" ;;
+esac
+```
+
+Then `/etc/cron.d/owltriage`. Cron's default `PATH` is only `/usr/bin:/bin`, so add the folder that holds
+`owltriage` (`command -v owltriage` shows it):
 
 ```cron
-5 3 * * *    root  owltriage update-feeds --feeds-dir /var/lib/owltriage/feeds --quiet
-*/15 * * * * root  owltriage hunt /var/log/auth.log /var/log/nginx/access.log --feeds-dir /var/lib/owltriage/feeds --out-dir /var/lib/owltriage/latest --allow 10.0.0.0/8 --fail-on high --quiet || logger -t owltriage "high-severity findings, see /var/lib/owltriage/latest/triage_report.txt"
+PATH=/usr/local/bin:/usr/bin:/bin
+OWLTRIAGE_FEEDS_DIR=/var/lib/owltriage/feeds
+5 3 * * *    root  owltriage update-feeds --quiet
+*/15 * * * * root  owltriage-cron
 ```
 
 **Gate a CI pipeline on a log bundle:**
