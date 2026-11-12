@@ -114,6 +114,6 @@ Files in `--rules-dir` are merged on top of the packaged rules. If an `id` alrea
 5. **Bounded quantifiers.** Rules only ever see the first 8 KB of input, but write
    `.{0,200}` instead of `.*` between keywords and avoid nested quantifiers like `(a+)+`,
    so a hostile 8 KB command line stays fast.
-6. Prefer behaviour that is hard to rename away (the PortProxy registry key) over names an
+6. Prefer behavior that is hard to rename away (the PortProxy registry key) over names an
    attacker controls (a renamed `psexec.exe`).
 7. Note known false positives in `false_positives:`.

@@ -1,6 +1,7 @@
 # docker build -t owltriage .
-# docker run --rm -v "$PWD:/work" owltriage hunt --demo
-# docker run --rm -v "$PWD:/work" -v /var/log:/logs:ro owltriage hunt /logs/auth.log
+# docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" owltriage hunt --demo
+# docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" owltriage hunt auth.log access.log
+# --user lets the container write ./owltriage-output as you; logs are read from the current folder.
 FROM python:3.12-slim
 WORKDIR /src
 COPY pyproject.toml README.md LICENSE ./

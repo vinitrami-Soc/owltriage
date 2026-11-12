@@ -46,7 +46,16 @@ class BlockRule:
 
 def parse_allowlist(entries: Iterable[str]) -> list:
     """Turn `--allow` values (IPs or CIDRs) into networks. Raises ValueError on bad input."""
-    return [ipaddress.ip_network(entry.strip(), strict=False) for entry in entries if entry.strip()]
+    networks = []
+    for entry in entries:
+        if not entry.strip():
+            continue
+        try:
+            networks.append(ipaddress.ip_network(entry.strip(), strict=False))
+        except ValueError:
+            raise ValueError(f"{entry.strip()!r} is not an IP address or CIDR range "
+                             "(examples: 198.51.100.7, 10.0.0.0/8)") from None
+    return networks
 
 
 def plan_blocks(findings: Iterable, allowlist: Sequence = (), min_severity: str = "medium"

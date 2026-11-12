@@ -14,9 +14,9 @@ SECRET_VARS = ("VT_API_KEY", "ABUSEIPDB_API_KEY", "DISCORD_WEBHOOK_URL", "SLACK_
                "THEHIVE_URL", "THEHIVE_API_KEY")
 
 
-def cli(*args, cwd=None, feeds_dir=None):
+def cli(*args, cwd=None, feeds_dir=None, columns=200):
     env = {k: v for k, v in os.environ.items() if k not in SECRET_VARS}
-    env["COLUMNS"] = "200"
+    env["COLUMNS"] = str(columns)
     env["PYTHONPATH"] = str(ROOT)
     env["OWLTRIAGE_FEEDS_DIR"] = str(feeds_dir or ROOT / "tests" / "no-feeds-here")
     return subprocess.run([sys.executable, "-m", "owltriage", *map(str, args)], capture_output=True, text=True, encoding="utf-8",
@@ -73,7 +73,8 @@ def test_allow_keeps_admin_range_out_of_block_script(tmp_path):
 @pytest.mark.parametrize("args, message", [
     (["hunt"], "No log files given"),
     (["hunt", "does-not-exist.log"], "Log file not found"),
-    (["hunt", "--demo", "--allow", "banana"], "Bad --allow value"),
+    (["hunt", "tests"], "is a folder. Pass the log files inside it"),
+    (["hunt", "--demo", "--allow", "banana"], "not an IP address or CIDR range"),
     (["alert"], "No alert file given"),
     (["alert", "missing.json"], "Alert file not found"),
 ])
@@ -121,8 +122,14 @@ def test_rules_test_and_list(tmp_path):
     assert run.returncode == 0 and "rules passed" in run.stdout
     listing = cli("rules", "list", "--type", "event")
     assert "win-dcsync" in listing.stdout and "web-xss" not in listing.stdout
+    assert "14 event rules" in listing.stdout                  # the count follows the filter
     rules = tmp_path / "rules"
     rules.mkdir()
+    (rules / "off.yml").write_text("- id: web-xss\n  enabled: false\n", encoding="utf-8")
+    web = cli("rules", "list", "--type", "web", "--rules-dir", rules, columns=80)
+    assert "12 web rules" in web.stdout and "XSS: script injection" in web.stdout
+    assert web.stdout.count("(disabled)") == 1
+    assert max(len(line) for line in web.stdout.splitlines()) <= 80   # titles fit an 80-column terminal
     (rules / "bad.yml").write_text("- id: web-broken\n  name: BROKEN\n  title: x\n  type: web\n  severity: low\n"
                                    "  pattern: 'abc'\n  tests:\n    match: ['xyz']\n")
     failing = cli("rules", "test", "web-broken", "--rules-dir", rules)
@@ -214,3 +221,24 @@ def test_legacy_console_encoding_does_not_crash(tmp_path):
     assert run.returncode == 0, run.stderr.decode("utf-8", "replace")[-500:]
     out = run.stdout.decode("utf-8")  # strict: the output really is UTF-8 now
     assert "(◉▼◉)" in out and "The owl's summary" in out
+
+
+@pytest.mark.parametrize("command", [["hunt", "--demo"], ["alert", "--demo"]])
+def test_unwritable_out_dir_exits_2_before_any_work(tmp_path, command):
+    blocker = tmp_path / "taken"
+    blocker.write_text("a file, not a folder", encoding="utf-8")
+    run = cli(*command, "--out-dir", blocker / "reports")
+    assert run.returncode == 2
+    assert "Can't write reports to" in run.stderr and "--out-dir" in run.stderr
+    assert "Traceback" not in run.stdout + run.stderr
+
+
+@pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="needs POSIX permissions and a non-root user")
+def test_unreadable_log_exits_2_with_a_hint(tmp_path):
+    log = tmp_path / "auth.log"
+    log.write_text("Jan  1 00:00:00 host sshd[1]: test\n", encoding="utf-8")
+    log.chmod(0)
+    run = cli("hunt", log, "--out-dir", tmp_path / "out")
+    assert run.returncode == 2
+    assert "Can't read" in run.stderr and "sudo" in run.stderr
+    assert "Traceback" not in run.stdout + run.stderr

@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import itertools
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -42,8 +44,9 @@ SVG_WIDTH = 150
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="owltriage",
+        formatter_class=argparse.RawDescriptionHelpFormatter,  # keep the docs URL on one line
         description="ATT&CK-mapped log hunting (Linux, web, Windows) and alert enrichment for blue teams.",
-        epilog="Docs: README.md · rule format: docs/RULES.md")
+        epilog="Every option, setting and output file: https://github.com/vinitrami-Soc/owltriage/blob/main/docs/CONFIGURATION.md")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
@@ -56,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     hunt = sub.add_parser("hunt", help="analyze log files offline (auth.log, access logs, .evtx / XML / JSON)")
     hunt.add_argument("logs", nargs="*", type=Path, help="log files; format is auto-detected")
-    hunt.add_argument("--demo", action="store_true", help="scan the bundled attack samples")
+    hunt.add_argument("--demo", action="store_true", help="scan the bundled Linux, web and Windows attack samples (no setup needed)")
     hunt.add_argument("--bad-ips", type=Path, action="append", default=[], metavar="FILE",
                       help="your own IP/CIDR blocklist, one per line (repeatable)")
     hunt.add_argument("--feeds-dir", type=Path, help=f"threat feed cache (default: {default_feeds_dir()})")
@@ -87,17 +90,45 @@ def build_parser() -> argparse.ArgumentParser:
     common(alert)
 
     rules = sub.add_parser("rules", help="list or self-test detection rules")
-    rules.add_argument("action", choices=("list", "test"))
-    rules.add_argument("ids", nargs="*", help="only these rule ids (test)")
-    rules.add_argument("--rules-dir", type=Path, action="append", default=[], metavar="DIR")
-    rules.add_argument("--type", choices=("web", "command", "line", "event", "correlation"), help="filter (list)")
+    rules.add_argument("action", choices=("list", "test"),
+                       help="list = show rules with ATT&CK ids; test = run each rule's examples")
+    rules.add_argument("ids", nargs="*", metavar="RULE_ID", help="rules to test (default: all)")
+    rules.add_argument("--rules-dir", type=Path, action="append", default=[], metavar="DIR",
+                       help="include your own YAML rules and overrides (repeatable)")
+    rules.add_argument("--type", choices=("web", "command", "line", "event", "correlation"),
+                       help="list only rules of this type")
 
     feeds = sub.add_parser("update-feeds", help="download free IP threat feeds into the local cache")
     feeds.add_argument("--feeds-dir", type=Path, help=f"cache directory (default: {default_feeds_dir()})")
     feeds.add_argument("--feeds-config", type=Path, help="YAML list of feeds (default: built-in list)")
     feeds.add_argument("--only", action="append", default=[], metavar="ID", help="update only this feed (repeatable)")
     feeds.add_argument("--list", action="store_true", help="show configured feeds and cache status, download nothing")
+    feeds.add_argument("--quiet", action="store_true", help="print only failures, to stderr (for cron)")
     return parser
+
+
+def _unreadable(paths: List[Path]) -> Optional[str]:
+    """The first file we may not open, e.g. /var/log/auth.log as a normal user (root:adm 0640)."""
+    for path in paths:
+        try:
+            with path.open("rb"):
+                pass
+        except OSError as exc:
+            return f"Can't read {path}: {exc.strerror or exc}. Run with sudo, or copy the file somewhere you can read it."
+    return None
+
+
+def _writable_out_dir(out_dir: Path, err: Console) -> bool:
+    """Check --out-dir up front, so a read-only folder fails in one clear line before the hunt starts."""
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryFile(dir=out_dir):
+            pass
+    except OSError as exc:
+        err.print(Text(f"Can't write reports to {out_dir}: {exc.strerror or exc}. "
+                       "Choose another folder with --out-dir.", style="bold red"))
+        return False
+    return True
 
 
 def _load_rules(args, err: Console):
@@ -118,17 +149,26 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
         err.print(Text("No log files given. Try: owltriage hunt --demo   or   owltriage hunt /var/log/auth.log",
                        style="bold red"))
         return 2
+    folders = [p for p in logs if p.is_dir()]
+    if folders:
+        err.print(Text(f"{folders[0]} is a folder. Pass the log files inside it, e.g. "
+                       f"owltriage hunt {Path(folders[0], '*.log')}", style="bold red"))
+        return 2
     missing = [str(p) for p in logs if not p.is_file()]
     if missing:
-        err.print(Text(f"Log file not found: {', '.join(missing)}", style="bold red"))
+        err.print(Text(f"Log file not found: {', '.join(missing)} (check the path, or try --demo)", style="bold red"))
+        return 2
+    problem = _unreadable(logs)
+    if problem:
+        err.print(Text(problem, style="bold red"))
         return 2
     try:
         allowlist = parse_allowlist(args.allow)
     except ValueError as exc:
-        err.print(Text(f"Bad --allow value: {exc}", style="bold red"))
+        err.print(Text(f"Invalid --allow value: {exc}", style="bold red"))
         return 2
     ruleset = _load_rules(args, err)
-    if ruleset is None:
+    if ruleset is None or not _writable_out_dir(args.out_dir, err):
         return 2
 
     # The owl: animated on an interactive terminal only (never for pipes, cron, CI, --quiet, --svg).
@@ -207,6 +247,11 @@ def cmd_alert(args, console: Console, err: Console) -> int:
     except (ValueError, json.JSONDecodeError) as exc:
         err.print(Text(f"Could not read alerts: {clean(exc, 150)}", style="bold red"))
         return 2
+    except OSError:
+        err.print(Text(_unreadable([args.alert_file]) or f"Can't read {args.alert_file}", style="bold red"))
+        return 2
+    if not _writable_out_dir(args.out_dir, err):
+        return 2
 
     settings = load_settings(args.env_file)
     if not args.mock and not settings.vt_api_key:
@@ -228,14 +273,24 @@ def cmd_rules(args, console: Console, err: Console) -> int:
     if ruleset is None:
         return 2
     if args.action == "list":
-        table = Table(box=box.SIMPLE_HEAVY, title=f"{len(ruleset.rules)} rules", title_style="bold")
-        for column in ("id", "type", "severity", "ATT&CK", "title", "enabled"):
-            table.add_column(column, no_wrap=column in ("id", "type", "severity"))
-        for rule in sorted(ruleset.rules.values(), key=lambda r: (r.type, r.id)):
-            if args.type and rule.type != args.type:
-                continue
-            table.add_row(rule.id, rule.type, rule.severity, ", ".join(rule.mitre) or "-", Text(rule.title),
-                          "yes" if rule.enabled else Text("no", style="dim"))
+        rules = sorted((r for r in ruleset.rules.values() if not args.type or r.type == args.type),
+                       key=lambda r: (r.type, r.id))
+        title = f"{len(rules)} {args.type + ' ' if args.type else ''}rule{'' if len(rules) == 1 else 's'}"
+        table = Table(box=box.SIMPLE_HEAVY, title=title, title_style="bold", pad_edge=False)
+        table.add_column("id", no_wrap=True)
+        table.add_column("severity", no_wrap=True)
+        table.add_column("ATT&CK", no_wrap=True)              # one technique per line keeps it narrow
+        table.add_column("title", ratio=1)
+        for rule_type, grouped in itertools.groupby(rules, key=lambda r: r.type):
+            if not args.type:
+                table.add_row(Text(rule_type, style="bold #60a5fa"), "", "", "")
+            group = list(grouped)
+            for i, rule in enumerate(group):
+                title_text = Text(rule.title, style="" if rule.enabled else "dim")
+                if not rule.enabled:
+                    title_text.append(" (disabled)", style="dim italic")
+                table.add_row(rule.id, rule.severity, "\n".join(rule.mitre) or "-", title_text,
+                              end_section=i == len(group) - 1)
         console.print(table)
         return 0
 
@@ -275,13 +330,16 @@ def cmd_update_feeds(args, console: Console, err: Console) -> int:
     results = update_feeds(specs, feeds_dir, only=args.only)
     style = {"updated": "bold green", "failed": "bold red", "skipped": "dim"}
     for r in results:
+        if args.quiet and r.status != "failed":
+            continue
         line = Text(f"{r.status.upper():8} ", style=style[r.status])
         line.append(f"{r.id:<18} ")
         if r.status == "updated":
             line.append(f"{r.entries:,} entries" + (f", {r.dropped} private/reserved dropped" if r.dropped else ""))
         line.append(f"  {r.detail}", style="dim")
-        console.print(line)
-    console.print(Text(f"Cache: {feeds_dir}", style="dim"))
+        (err if args.quiet else console).print(line)         # --quiet: failures only, on stderr
+    if not args.quiet:
+        console.print(Text(f"Cache: {feeds_dir}", style="dim"))
     attempted = [r for r in results if r.status != "skipped"]
     return 1 if attempted and all(r.status == "failed" for r in attempted) else 0
 

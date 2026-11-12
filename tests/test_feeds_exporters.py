@@ -181,3 +181,20 @@ def test_ioc_csv(demo_result, tmp_path):
     rows = list(csv.DictReader(write_iocs_csv(result, tmp_path / "i.csv").open()))
     assert {r["verdict"] for r in rows} <= {"MALICIOUS", "SUSPICIOUS"}
     assert any(r["ip"] == "198.51.100.77" and "T1110.001" in r["mitre"] for r in rows)
+
+
+def test_update_feeds_quiet_prints_only_failures(feed_server, tmp_path, monkeypatch, capsys):
+    from owltriage.cli import main
+    base, routes = feed_server
+    routes["/good.txt"] = (200, b"9.9.9.9\n")
+    config = tmp_path / "feeds.yml"
+    config.write_text(f"- id: good\n  url: {base}/good.txt\n- id: gone\n  url: {base}/missing.txt\n", encoding="utf-8")
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.delenv(var, raising=False)              # the fake feed server is on localhost
+    argv = ["update-feeds", "--feeds-config", str(config), "--feeds-dir", str(tmp_path / "cache")]
+    assert main([*argv, "--quiet"]) == 0                    # one feed worked, so cron sees success
+    quiet = capsys.readouterr()
+    assert "gone" in quiet.err and "HTTP 404" in quiet.err
+    assert quiet.out == "" and "good" not in quiet.err
+    assert main(argv) == 0
+    assert "good" in capsys.readouterr().out

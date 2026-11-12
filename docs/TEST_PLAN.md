@@ -33,7 +33,7 @@ version, and when an external service misbehaves.
 | HTTP integration | `test_http_integration.py` | Real HTTP to a local fake VirusTotal/AbuseIPDB/Discord/Slack/TheHive: headers, auth, 401/429/502, timeouts, partial TheHive failures |
 | E2E | `test_cli.py`, `test_block_script.py` | The CLI as a subprocess (exit codes 0/1/2, `--demo`, `--quiet`, `--allow`, `--fail-on`, custom and overriding rules, cached feeds, NDJSON alerts); `block_ips.sh` executed against a fake `iptables` (idempotent, undo, aborts on failure) |
 | Security & robustness | `test_security_robustness.py` | ANSI/markup/bidi injection, forged report lines, `@everyone`, Discord/Slack size limits, malformed alerts, Hypothesis fuzzing, ReDoS inputs, no Trojan-Source characters in the repo |
-| The owl & the summary | `test_banner_summary.py` | Animation only on an interactive terminal (off for pipes, CI, `--quiet`, `--no-anim`, tiny terminals); every frame of the story with a fake clock (branch → bar → walks with progress → looks around when stalled → home), constant frame height, ≤ 1.5 s budget, compact mode adds no time; a **real PTY run** checks the animation and its cost; the owl's summary tells the right stories and next steps; piped output has no colours or big logo |
+| The owl & the summary | `test_banner_summary.py` | Animation only on an interactive terminal (off for pipes, CI, `--quiet`, `--no-anim`, tiny terminals); every frame of the story with a fake clock (branch → bar → walks with progress → looks around when stalled → home), constant frame height, ≤ 1.5 s budget, compact mode adds no time; a **real PTY run** checks the animation and its cost; the owl's summary tells the right stories and next steps; piped output has no colors or big logo |
 | Real attacks | `test_real_evtx.py` | ~280 EVTX-ATTACK-SAMPLES files parse without crashing; 12 known attacks stay detected |
 | Performance | `test_performance.py` | 100k lines well under the limit; memory does not grow with file size |
 
@@ -84,13 +84,16 @@ Bugs are injected into security-critical code one at a time; each must make the 
 | Abbreviated `netsh I p a v` evaded the portproxy command rule | Real sample `de_portforward_netsh_rdp_sysmon_13_1.evtx` | Added a registry-based rule that renaming cannot dodge |
 | Obfuscated `IEX(... [char]0x53 ...)` payloads were only "low" | Real samples | New obfuscated-IEX rule (high) |
 | Throughput dropped with 4× more rules | Profiling | Cached timestamp parsing: about +20 % |
+| Docker: `docker run -v "$PWD:/work"` crashed with a PermissionError traceback for normal users | Building and running the image | Docs use `--user`; unreadable logs and a read-only `--out-dir` exit 2 with a hint |
 
 ## Known gaps
 
 - Live services (VirusTotal, AbuseIPDB, Discord, Slack, TheHive, Wazuh) are exercised
   through local fakes that follow their documented APIs, not the real services.
 - Real `iptables` is never run (a fake records the calls). Try `block_ips.sh` on a VM first.
-- The Dockerfile was not built here (no Docker daemon in the test environment).
+- The Docker image is built and run by hand, not in CI. Checked: `hunt --demo`, hunting your own logs and
+  `alert --demo` as a non-root host user with `--user`; a root-only log and a read-only folder fail with
+  a clear message (exit 2) instead of a traceback.
 - Threat-feed downloads were tested live only for GitHub-hosted feeds (IPsum, FireHOL);
   abuse.ch, blocklist.de and Emerging Threats were unreachable from the test sandbox.
 - No benign Windows corpus was available, so false-positive rates on busy Windows estates

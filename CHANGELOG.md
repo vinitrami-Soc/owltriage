@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md): every flag, `.env` setting, environment variable,
+  output file and exit code in one place, with recipes for cron, CI and air-gapped machines.
+- `owltriage update-feeds --quiet` prints only failures, to stderr, so cron mails you only when a feed fails.
+
+### Changed
+- README rewritten around a five-minute quick start, an "Everyday use" table and a docs index.
+- `.env.example` explains every setting and where to get each key.
+- `owltriage rules list` groups rules by type, fits an 80-column terminal, marks disabled rules,
+  and its count follows `--type`.
+- Clearer help text for `owltriage rules`, and `--help` links to the configuration reference.
+
+### Fixed
+- A log you can't read (e.g. `/var/log/auth.log` as a normal user), a folder passed instead of log files,
+  or an `--out-dir` you can't write to now stop with a one-line explanation and exit code 2 instead of
+  a Python traceback.
+- Docker instructions use `--user "$(id -u):$(id -g)"`; without it the container could not write the
+  report into your folder.
+- `--allow` with a bad value says what it expects (an IP or CIDR range, with examples).
+- ATT&CK badge: the rules cover 35 techniques, not 36.
+
 ## 2.0.0
 
 Rebuilt for the wider blue team community, and renamed **OwlTriage**.
