@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -285,7 +286,18 @@ def cmd_update_feeds(args, console: Console, err: Console) -> int:
     return 1 if attempted and all(r.status == "failed" for r in attempted) else 0
 
 
+def _utf8_stdio() -> None:
+    """Windows pipes and redirects default to a legacy code page (cp1252) that can't encode the
+    owl, the bar or non-ASCII log content; without this, `owltriage hunt x > report.txt` crashes."""
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", "") or "").lower().replace("-", "").replace("_", "")
+        if encoding != "utf8" and hasattr(stream, "reconfigure"):
+            with contextlib.suppress(ValueError, OSError):  # e.g. a stream already used in binary mode
+                stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
+    _utf8_stdio()
     parser = build_parser()
     if not (sys.argv[1:] if argv is None else argv):  # bare `owltriage`: say hello, then show usage
         console = make_console()

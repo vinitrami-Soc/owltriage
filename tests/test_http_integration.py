@@ -187,8 +187,10 @@ def test_unreachable_host_is_reported_not_raised(tmp_path):
     report = TriagePipeline(settings, mock=True, out_dir=tmp_path, session=session()).run(
         load_alerts(DATA / "dummy_alert.json")[0])
     statuses = {name: (status, detail) for name, status, detail in report.actions}
-    assert statuses["Discord webhook"] == ("failed", "network error (ConnectionError)")
-    assert statuses["TheHive case"] == ("failed", "network error (ConnectionError)")
+    # Linux refuses a closed port at once (ConnectionError); Windows lets it time out (ConnectTimeout).
+    refused = {("failed", "network error (ConnectionError)"), ("failed", "network error (ConnectTimeout)")}
+    assert statuses["Discord webhook"] in refused
+    assert statuses["TheHive case"] in refused
 
 
 def test_vt_quota_exhausted(soc, tmp_path):

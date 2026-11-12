@@ -202,3 +202,15 @@ def test_svg_screenshot(tmp_path):
     svg = tmp_path / "shot.svg"
     assert cli("hunt", "--demo", "--out-dir", tmp_path, "--svg", svg).returncode == 0
     assert svg.read_text().startswith("<svg")
+
+
+def test_legacy_console_encoding_does_not_crash(tmp_path):
+    """Windows pipes/redirects use cp1252 by default; the owl and the bar must not crash the run."""
+    env = {k: v for k, v in os.environ.items() if k not in SECRET_VARS}
+    env.update({"PYTHONIOENCODING": "cp1252", "PYTHONPATH": str(ROOT),
+                "OWLTRIAGE_FEEDS_DIR": str(tmp_path / "none")})
+    run = subprocess.run([sys.executable, "-m", "owltriage", "hunt", "--demo", "--out-dir", str(tmp_path)],
+                         capture_output=True, env=env, timeout=120)
+    assert run.returncode == 0, run.stderr.decode("utf-8", "replace")[-500:]
+    out = run.stdout.decode("utf-8")  # strict: the output really is UTF-8 now
+    assert "(◉▼◉)" in out and "The owl's summary" in out
