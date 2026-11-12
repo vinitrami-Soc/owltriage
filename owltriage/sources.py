@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import codecs
+import gzip
 from pathlib import Path
 from typing import Iterator, Optional
 
-from .log_parser import LogEvent, iter_text_events
+from .log_parser import GZIP_MAGIC, LogEvent, iter_text_events
 from .windows import iter_evtx, iter_windows_json, iter_windows_xml
 
 EVTX_MAGIC = b"ElfFile\x00"
@@ -16,6 +17,13 @@ def detect_format(path) -> str:
     path = Path(path)
     with path.open("rb") as handle:
         head = handle.read(4096)
+    if head.startswith(GZIP_MAGIC):  # rotated logs: look at what is inside
+        try:
+            with gzip.open(path, "rb") as packed:
+                head = packed.read(4096)
+        except (OSError, EOFError):
+            return "text"  # the text reader reports the damage
+        return "jsonl" if head.lstrip().startswith(b"{") else "text"
     if head.startswith(EVTX_MAGIC) or path.suffix.lower() == ".evtx":
         return "evtx"
     if head.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):

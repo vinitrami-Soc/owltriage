@@ -45,6 +45,15 @@ Rebuilt for the wider blue team community, and renamed **OwlTriage**.
   log, a folder instead of log files, an `--out-dir` you can't write to, or an invalid `--allow` value.
 - Docker instructions use `--user "$(id -u):$(id -g)"` so the container can write the report into
   your folder.
+- Rotated `.gz` logs (`auth.log.2.gz`) are read instead of silently giving zero findings.
+- Brute-force windows no longer mix files read newest-first (`auth.log auth.log.1`), which gave false
+  brute-force and "login after brute force" findings; a syslog file that crosses New Year keeps
+  its order.
+- "message repeated N times" lines no longer use memory per repeat (a 244 KB crafted log took 1.6 GB).
+- Alert files and blocklists saved with a UTF-8 BOM (Windows PowerShell) are read correctly; alert
+  NDJSON lines that are not objects and an `Infinity` rule level no longer crash the pipeline.
+- IPv6 addresses in an alert's `full_log` are enriched; `--threshold` below 1 and a negative
+  `--window` are refused.
 
 ## 1.0.0
 - First release: offline SSH/web log hunt and VirusTotal / AbuseIPDB / Discord / Slack / TheHive pipeline.

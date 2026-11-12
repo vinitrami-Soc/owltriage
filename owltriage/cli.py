@@ -41,6 +41,19 @@ DEMO_LOGS = [SAMPLES / "auth.log", SAMPLES / "access.log", SAMPLES / "windows_se
 SVG_WIDTH = 150
 
 
+def _at_least(minimum: int):
+    """argparse type: a whole number >= minimum, with an error that says so."""
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+        if value < minimum:
+            raise argparse.ArgumentTypeError(f"must be {minimum} or more (got {value})")
+        return value
+    return parse
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="owltriage",
@@ -66,8 +79,8 @@ def build_parser() -> argparse.ArgumentParser:
     hunt.add_argument("--no-feeds", action="store_true", help="do not load downloaded threat feeds")
     hunt.add_argument("--rules-dir", type=Path, action="append", default=[], metavar="DIR",
                       help="extra YAML rules; same id = override a built-in rule (repeatable)")
-    hunt.add_argument("--threshold", type=int, help="failed logins per IP for brute force (rule default: 5)")
-    hunt.add_argument("--window", type=int, metavar="SECONDS",
+    hunt.add_argument("--threshold", type=_at_least(1), help="failed logins per IP for brute force (rule default: 5)")
+    hunt.add_argument("--window", type=_at_least(0), metavar="SECONDS",
                       help="brute-force time window (rule default: 600; 0 = whole file)")
     hunt.add_argument("--year", type=int, help="year for syslog timestamps that have none (default: this year)")
     hunt.add_argument("--allow", action="append", default=[], metavar="IP_OR_CIDR",

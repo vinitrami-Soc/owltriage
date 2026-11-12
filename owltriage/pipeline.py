@@ -24,7 +24,7 @@ from .cases import TheHiveClient, build_case_payload, build_observable_payloads
 from .config import Settings
 from .defense import BlockRule
 from .enrichment import AbuseIPDBClient, IntelResult, VirusTotalClient, load_mock_responses
-from .log_parser import extract_ips, normalize_ip
+from .log_parser import extract_ips, extract_ipv6, normalize_ip
 from .notify import build_discord_payload, build_slack_payload, send_webhook
 from .utils import SEVERITY_RANK, clean, rel
 
@@ -55,13 +55,20 @@ class Observable:
 
 def load_alerts(path) -> List[dict]:
     """Accept a single alert object, a JSON list, or Wazuh's alerts.json (one JSON per line)."""
-    text = Path(path).read_text(encoding="utf-8").strip()
+    text = Path(path).read_text(encoding="utf-8-sig").strip()  # -sig: Windows PowerShell 5 writes a BOM
     if not text:
         return []
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        return [json.loads(line) for line in text.splitlines() if line.strip()]
+        alerts = []
+        for number, line in enumerate(text.splitlines(), 1):
+            if line.strip():
+                alert = json.loads(line)
+                if not isinstance(alert, dict):
+                    raise ValueError(f"line {number} is not a JSON object (one alert per line expected)") from None
+                alerts.append(alert)
+        return alerts
     if isinstance(data, dict):
         return [data]
     if isinstance(data, list):
@@ -123,7 +130,7 @@ def extract_observables(alert: dict) -> Tuple[List[Observable], List[Tuple[str, 
             add_hashes(value, name)
 
     full_log = str(alert.get("full_log") or "")
-    for ip in extract_ips(full_log):
+    for ip in extract_ips(full_log) + extract_ipv6(full_log):
         add_ip(ip, "full_log")
     if not any(o.kind == "hash" for o in found):
         add_hashes(full_log, "full_log")
@@ -160,7 +167,7 @@ class TriageReport:
 
         try:
             level = int(_dig(alert, "rule.level") or 0)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):  # json accepts Infinity and NaN
             level = 0
         username = next((text(p) for p in USER_FIELDS if _dig(alert, p)), None)
         mitre = _dig(alert, "rule.mitre.id") or []

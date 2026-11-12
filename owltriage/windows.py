@@ -18,7 +18,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from defusedxml.ElementTree import fromstring, iterparse
 
-from .log_parser import LogEvent, normalize_ip, parse_line
+from .log_parser import LogEvent, normalize_ip, open_log, parse_line
 from .timeutil import to_epoch
 from .utils import clean
 
@@ -261,7 +261,7 @@ def iter_evtx(path) -> Iterator[LogEvent]:
 def iter_windows_json(path, year: Optional[int] = None) -> Iterator[LogEvent]:
     """JSON lines. Lines that are not Windows events are still parsed as plain text."""
     path = Path(path)
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
+    with open_log(path) as handle:
         for number, line in enumerate(handle, 1):
             if not line.strip():
                 continue

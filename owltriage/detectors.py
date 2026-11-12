@@ -207,7 +207,8 @@ class Analyzer:
         self.result = AnalysisResult(blocklist_size=len(self.bad_ips),
                                      rules_loaded=len(self.rules.enabled()))
         self._findings = FindingCollector()
-        self._fail_times: Dict[str, deque] = defaultdict(deque)
+        self._fail_times: Dict[str, deque] = defaultdict(deque)  # [epoch, count] pairs, oldest first
+        self._fail_sum: Dict[str, int] = defaultdict(int)          # sum of the counts in _fail_times
         self._fail_users: Dict[str, Set[str]] = defaultdict(set)
         self._fail_services: Dict[str, Counter] = defaultdict(Counter)
         self._brute_hits: Dict[str, dict] = {}
@@ -294,11 +295,36 @@ class Analyzer:
 
     # -- authentication --------------------------------------------------------
     def _recent_failures(self, ip: str, now: Optional[float]) -> int:
+        """Failed logins from `ip` in the window ending at `now` (all so far without a window or time)."""
+        if not self.window or now is None:
+            return self.result.failed_by_ip[ip]
+        return sum(count for epoch, count in self._fail_times[ip] if now - self.window <= epoch <= now)
+
+    def _add_failures(self, ip: str, epoch: Optional[float], count: int) -> int:
+        """Record failures as one (epoch, count) pair and return how many fall in the window ending at
+        `epoch`. Later events never count for earlier ones, so files read newest-first stay correct."""
+        if not self.window or epoch is None:
+            return self.result.failed_by_ip[ip]
         times = self._fail_times[ip]
-        if self.window and now is not None:
-            while times and times[0] is not None and times[0] < now - self.window:
-                times.popleft()
-        return len(times)
+        if times and epoch < times[-1][0] - self.window:   # jumped back in time, e.g. auth.log.1 after auth.log
+            times.clear()
+            self._fail_sum[ip] = 0
+        i = len(times)
+        while i and times[i - 1][0] > epoch:                # slightly out of order: insert in place
+            i -= 1
+        if i and times[i - 1][0] == epoch:
+            times[i - 1][1] += count
+        else:
+            times.insert(i, [epoch, count])
+        self._fail_sum[ip] += count
+        while times[0][0] < times[-1][0] - self.window:
+            self._fail_sum[ip] -= times.popleft()[1]
+        later = 0
+        for when, n in reversed(times):
+            if when <= epoch:
+                break
+            later += n
+        return self._fail_sum[ip] - later
 
     def _on_failed_login(self, event: LogEvent) -> None:
         ip = event.ip
@@ -307,12 +333,7 @@ class Analyzer:
         self.result.failed_usernames[user] += event.repeat
         self._fail_users[ip].add(user)
         self._fail_services[ip][event.service or "ssh"] += event.repeat
-        times = self._fail_times[ip]
-        times.extend([event.epoch] * event.repeat)
-        if not self.window and len(times) > self.threshold:  # whole-file counting: no need to keep them all
-            while len(times) > self.threshold:
-                times.popleft()
-        recent = self._recent_failures(ip, event.epoch)
+        recent = self._add_failures(ip, event.epoch, event.repeat)
         if self.brute and recent >= self.threshold:
             hit = self._brute_hits.setdefault(ip, {"event": event, "peak": 0})
             hit["peak"] = max(hit["peak"], recent)

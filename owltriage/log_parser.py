@@ -6,17 +6,21 @@ Every line becomes a `LogEvent`; Windows logs produce the same `LogEvent` type
 """
 from __future__ import annotations
 
+import gzip
 import ipaddress
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import IO, Dict, Iterator, List, Optional
 from urllib.parse import unquote
 
 from .timeutil import to_epoch
 
 MAX_LINE = 65_536  # longer "lines" are junk or an attack on the parser; keep the head only
+GZIP_MAGIC = b"\x1f\x8b"  # logrotate compresses old logs: auth.log.2.gz
+YEAR_ROLLOVER = 200 * 86400  # a year-less syslog time this far back means the file crossed New Year
 
 # Four dot-separated 1-3 digit groups that are not part of a longer dotted string
 # such as a version number (1.2.3.4.5). Matches are validated with `ipaddress`.
@@ -92,6 +96,20 @@ def normalize_ip(value: Optional[str]) -> Optional[str]:
     if addr.version == 6 and addr.ipv4_mapped:
         addr = addr.ipv4_mapped
     return str(addr)
+
+
+# Hex groups with at least two colons; validated with `ipaddress`, so times like 03:14:25 never pass.
+IPV6_CANDIDATE = re.compile(r"(?<![\w:.])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:.])")
+
+
+def extract_ipv6(text: str) -> List[str]:
+    """All valid IPv6 addresses in `text`, de-duplicated, in order of appearance."""
+    seen: List[str] = []
+    for match in IPV6_CANDIDATE.finditer(text):
+        ip = normalize_ip(match.group(0))
+        if ip and ":" in ip and ip not in seen:
+            seen.append(ip)
+    return seen
 
 
 def extract_ips(text: str) -> List[str]:
@@ -171,13 +189,38 @@ def parse_line(line: str, line_no: int = 0, source: str = "-", year: Optional[in
     return event
 
 
+def open_log(path) -> IO[str]:
+    """Open a log as text, transparently decompressing gzip (logrotate's auth.log.2.gz)."""
+    path = Path(path)
+    with path.open("rb") as handle:
+        compressed = handle.read(2) == GZIP_MAGIC
+    if compressed:
+        return gzip.open(path, "rt", encoding="utf-8", errors="replace")
+    return path.open("r", encoding="utf-8", errors="replace")
+
+
 def iter_text_events(path, year: Optional[int] = None) -> Iterator[LogEvent]:
     """Yield one `LogEvent` per non-empty line without loading the whole file."""
+    from .windows import SourceError  # windows.py imports this module
+
     path = Path(path)
-    with path.open("r", encoding="utf-8", errors="replace") as handle:
-        for line_no, line in enumerate(handle, 1):
-            if line.strip():
-                yield parse_line(line, line_no, path.name, year)
+    current = year or datetime.now(timezone.utc).year
+    previous: Optional[float] = None
+    try:
+        with open_log(path) as handle:
+            for line_no, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                event = parse_line(line, line_no, path.name, current)
+                if (event.epoch is not None and previous is not None and event.epoch < previous - YEAR_ROLLOVER
+                        and event.timestamp[:1].isalpha()):  # year-less syslog time: Dec 31 -> Jan 1
+                    current += 1
+                    event = parse_line(line, line_no, path.name, current)
+                if event.epoch is not None:
+                    previous = event.epoch
+                yield event
+    except (OSError, EOFError) as exc:  # a truncated or damaged .gz
+        raise SourceError(f"{path.name}: damaged compressed file ({exc})") from None
 
 
 def iter_events(path, year: Optional[int] = None) -> Iterator[LogEvent]:

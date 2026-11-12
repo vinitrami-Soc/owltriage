@@ -39,7 +39,7 @@ class BadIPList:
         return blocklist
 
     def load_file(self, path, source: str = "local") -> None:
-        with Path(path).open(encoding="utf-8", errors="replace") as handle:
+        with Path(path).open(encoding="utf-8-sig", errors="replace") as handle:  # -sig: drop a Windows BOM
             for line_no, line in enumerate(handle, 1):
                 self.add_line(line, line_no, source)
 
