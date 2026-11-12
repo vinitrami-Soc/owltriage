@@ -242,16 +242,20 @@ def iter_evtx(path) -> Iterator[LogEvent]:
         parser = PyEvtxParser(str(path))
     except Exception as exc:  # the Rust parser raises its own error types
         raise SourceError(f"{path.name}: not a readable .evtx file ({clean(exc, 100)})") from None
-    bad = 0
+    bad = good = 0
     for number, record in enumerate(parser.records(), 1):
         try:
             element = fromstring(record["data"])
         except Exception:  # corrupt record or refused XML: skip it, keep going
             bad += 1
             continue
+        good += 1
         yield event_from_record(record_from_element(element), path.name, number)
     if bad:
         raise SourceError(f"{path.name}: skipped {bad} unreadable record(s)")
+    if not good:
+        # Some evtx versions read a damaged file as "no records" instead of raising: never stay silent.
+        raise SourceError(f"{path.name}: no event records found (empty or damaged .evtx?)")
 
 
 def iter_windows_json(path, year: Optional[int] = None) -> Iterator[LogEvent]:

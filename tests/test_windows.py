@@ -140,7 +140,7 @@ def test_corrupt_evtx_is_a_warning():
     pytest.importorskip("evtx")
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".evtx", delete=False) as handle:
-        handle.write(b"ElfFile\x00" + os.urandom(4096))
+        handle.write(b"ElfFile\x00" + bytes(range(256)) * 16)  # fixed bytes: deterministic in CI
     try:
         result = analyze([handle.name])
         assert result.warnings and result.lines_scanned == 0
@@ -159,3 +159,15 @@ def test_encoded_command_detection_on_utf16():
     from owltriage.detectors import decode_base64_blobs
     [(token, decoded)] = decode_base64_blobs(f"powershell -enc {encoded}")
     assert decoded.startswith("Invoke-Expression")
+
+
+def test_damaged_evtx_never_passes_silently(tmp_path):
+    """Whatever the evtx library version does with a damaged file, the analyst gets a warning."""
+    pytest.importorskip("evtx")
+    import random
+    rng = random.Random(1234)
+    for i in range(25):
+        path = tmp_path / f"damaged{i}.evtx"
+        path.write_bytes(b"ElfFile\x00" + bytes(rng.randrange(256) for _ in range(4096)))
+        result = analyze([path])
+        assert result.warnings, f"no warning for damaged file #{i}"
