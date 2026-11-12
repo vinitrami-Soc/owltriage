@@ -5,6 +5,7 @@
 
 <p align="center">
 <a href="https://github.com/vinitrami-Soc/owltriage/actions/workflows/ci.yml"><img src="https://github.com/vinitrami-Soc/owltriage/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+<a href="https://github.com/vinitrami-Soc/owltriage/releases/latest"><img src="https://img.shields.io/github/v/release/vinitrami-Soc/owltriage" alt="Latest release"></a>
 <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="Python 3.9+">
 <img src="https://img.shields.io/badge/rules-59-orange" alt="59 rules">
 <img src="https://img.shields.io/badge/ATT%26CK-35%20techniques-red" alt="35 ATT&CK techniques">
