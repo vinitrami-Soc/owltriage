@@ -74,3 +74,17 @@
   mitre: [T1071]
   block: outbound
   description: An IP address found inside a decoded payload; usually a payload or C2 server.
+
+- id: win-explicit-credential-spray
+  name: BRUTE_FORCE
+  title: Password spraying with explicit credentials
+  type: correlation
+  severity: high
+  mitre: [T1110.003]
+  min_accounts: 10        # different accounts tried from one source...
+  window_seconds: 600     # ...within this many seconds
+  block: inbound
+  description: >
+    Windows event 4648 ("a logon was attempted using explicit credentials") from one source
+    against many different accounts. A few accounts is normal (runas, scheduled tasks); ten
+    or more in minutes is a spray, even when the attempts do not fail outright.

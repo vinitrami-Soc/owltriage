@@ -226,3 +226,58 @@
   tests:
     match: [{event_id: 13, provider: Microsoft-Windows-Sysmon, TargetObject: 'HKLM\System\CurrentControlSet\services\PortProxy\v4tov4\tcp\1.2.3.4/8001', Details: 1.2.3.5/3389}]
     no_match: [{event_id: 13, provider: Microsoft-Windows-Sysmon, TargetObject: 'HKLM\System\CurrentControlSet\services\Tcpip\Parameters'}]
+
+- id: win-psexec-service-security
+  name: LATERAL_MOVEMENT
+  title: PsExec-style remote service (Security log)
+  type: event
+  severity: high
+  mitre: [T1569.002, T1021.002]
+  description: >
+    Event 4697 is the Security-log twin of System 7045 ("a service was installed").
+    Hosts that only forward the Security log still show PsExec this way.
+  match:
+    event_id: 4697
+    fields:
+      ServiceFileName: 'psexesvc|remcomsvc|paexec|csexecsvc|\\\\[^\\]+\\admin\$'
+  detail: "{ServiceName}: {ServiceFileName} by {SubjectUserName}"
+  tests:
+    match: [{event_id: 4697, ServiceName: PSEXESVC, ServiceFileName: '%SystemRoot%\PSEXESVC.exe', SubjectUserName: admmig}]
+    no_match: [{event_id: 4697, ServiceName: Spooler, ServiceFileName: 'C:\Windows\System32\spoolsv.exe'}]
+
+- id: win-psexec-share
+  name: LATERAL_MOVEMENT
+  title: Remote execution tool copied over an admin share
+  type: event
+  severity: high
+  mitre: [T1021.002, T1569.002]
+  description: >
+    Event 5145 (detailed file share auditing): PsExec, RemCom and PAExec copy their
+    service binary to ADMIN$ and talk over named pipes on IPC$ before they run.
+  match:
+    event_id: 5145
+    fields:
+      RelativeTargetName: 'psexesvc|remcomsvc|remcom_communic|paexec|csexecsvc'
+  detail: "{SubjectUserName} from {IpAddress}: {ShareName}\\{RelativeTargetName}"
+  tests:
+    match: [{event_id: 5145, ShareName: '\\*\ADMIN$', RelativeTargetName: PSEXESVC.exe, SubjectUserName: admmig, IpAddress: 10.23.42.22}]
+    no_match: [{event_id: 5145, ShareName: '\\*\Users', RelativeTargetName: 'bob\notes.txt', SubjectUserName: bob}]
+
+- id: win-mimikatz-binary
+  name: CREDENTIAL_DUMPING
+  title: Mimikatz binary running
+  type: event
+  severity: critical
+  mitre: [T1003, T1003.001]
+  description: >
+    A process named mimikatz.exe (or mimikatz64.exe) shows up in privilege use, object
+    access, process creation or LSASS access events. Renamed copies are caught by the
+    command and LSASS-access rules instead.
+  match:
+    event_id: [1, 10, 4656, 4663, 4673, 4674, 4688]
+    fields:
+      '*': '(?:^|[\\/])mimikatz(?:64)?\.exe$'
+  detail: "{ProcessName|NewProcessName|Image|SourceImage} ({SubjectUserName|User|SourceUser})"
+  tests:
+    match: [{event_id: 4673, ProcessName: 'C:\Tools\mimikatz\x64\mimikatz.exe', SubjectUserName: Sec504, PrivilegeList: SeTcbPrivilege}]
+    no_match: [{event_id: 4673, ProcessName: 'C:\Tools\mimikatz-detector\scanner.exe', SubjectUserName: analyst}]

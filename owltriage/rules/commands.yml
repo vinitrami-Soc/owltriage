@@ -182,10 +182,10 @@
   type: command
   severity: critical
   mitre: [T1003.001]
-  pattern: '\bprocdump(?:64)?(?:\.exe)?\b.{0,100}\blsass\b|\bcomsvcs(?:\.dll)?\b.{0,50}\bMiniDump\b|\bsekurlsa::|\blsadump::|\bMiniDumpWriteDump\b|\bOut-Minidump\b|\brdrleakdiag(?:\.exe)?\b.{0,100}/fullmemdmp\b'
+  pattern: '\bprocdump(?:64)?(?:\.exe)?\b.{0,100}\blsass\b|\bcomsvcs(?:\.dll)?\b.{0,50}\bMiniDump\b|\bsekurlsa::|\blsadump::|\bMiniDumpWriteDump\b|\bOut-Minidump\b|\brdrleakdiag(?:\.exe)?\b.{0,100}/fullmemdmp\b|\bcreatedump(?:\.exe)?\b.{0,200}\blsass\b'
   tests:
-    match: ["procdump64.exe -accepteula -ma lsass.exe lsass.dmp", "rundll32.exe C:\\windows\\System32\\comsvcs.dll, MiniDump 624 C:\\temp\\out.dmp full", "mimikatz.exe sekurlsa::logonpasswords", "$WER::MiniDumpWriteDump($ProcessHandle, $ProcessId, $FileStream.SafeFileHandle)", "rdrleakdiag.exe /p 640 /o C:\\temp /fullmemdmp /wait 1"]
-    no_match: ["procdump -ma notepad.exe"]
+    match: ["procdump64.exe -accepteula -ma lsass.exe lsass.dmp", "rundll32.exe C:\\windows\\System32\\comsvcs.dll, MiniDump 624 C:\\temp\\out.dmp full", "mimikatz.exe sekurlsa::logonpasswords", "$WER::MiniDumpWriteDump($ProcessHandle, $ProcessId, $FileStream.SafeFileHandle)", "rdrleakdiag.exe /p 640 /o C:\\temp /fullmemdmp /wait 1", "\"C:\\Program Files\\PowerShell\\7\\createdump.exe\" -u -f C:\\Temp\\dotnet-lsass.dmp 640"]
+    no_match: ["procdump -ma notepad.exe", "createdump.exe -f C:\\dumps\\myapp.dmp 4242"]
 
 - id: cmd-net-admin-add
   name: PRIVILEGE_ESCALATION

@@ -7,8 +7,8 @@
 <a href="https://github.com/vinitrami-Soc/owltriage/actions/workflows/ci.yml"><img src="https://github.com/vinitrami-Soc/owltriage/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
 <a href="https://github.com/vinitrami-Soc/owltriage/releases/latest"><img src="https://img.shields.io/github/v/release/vinitrami-Soc/owltriage" alt="Latest release"></a>
 <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="Python 3.9+">
-<img src="https://img.shields.io/badge/rules-59-orange" alt="59 rules">
-<img src="https://img.shields.io/badge/ATT%26CK-35%20techniques-red" alt="35 ATT&CK techniques">
+<img src="https://img.shields.io/badge/rules-65-orange" alt="65 rules">
+<img src="https://img.shields.io/badge/ATT%26CK-37%20techniques-red" alt="37 ATT&CK techniques">
 <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT license">
 </p>
 
@@ -147,9 +147,9 @@ The format is detected from the file content, so you can mix sources in one run.
 
 | Source | Formats | Examples of what it catches |
 |---|---|---|
-| Linux auth / syslog | `auth.log`, `secure`, `syslog` | SSH brute force and password spraying (time-windowed), login after brute force, sudo abuse, new users, sudo-group changes, reverse shells and `curl \| sh` in sudo commands |
-| Web servers | Apache / Nginx combined | SQLi (UNION, tautology, stacked, time-based), XSS, path traversal, command injection, Log4Shell, Shellshock, `.env`/`.git` probes, scanner user-agents |
-| Windows | `.evtx`, `wevtutil` XML (UTF-8/16), Winlogbeat and flat JSON | RDP/SMB/Kerberos brute force and spraying, DCSync, LSASS dumping (Sysmon 10, 4656/4663, comsvcs, procdump, rdrleakdiag), ntds.dit theft, Kerberoasting, log clearing, admin-group changes, suspicious services, PsExec, shadow-copy deletion, Defender tampering, PowerShell `-enc`, download cradles and obfuscated `IEX` (4688, Sysmon 1, 4104 ScriptBlock) |
+| Linux auth / syslog | `auth.log`, `secure`, `syslog` | SSH brute force and password spraying (time-windowed, old and new OpenSSH formats), login after brute force, sudo abuse, new users (Debian, Ubuntu, SUSE), sudo-group changes, reverse shells and `curl \| sh` in sudo commands |
+| Web servers | Apache / Nginx combined | SQLi (UNION, tautology, stacked, time-based), XSS, path traversal, command injection, remote file inclusion, Log4Shell, Shellshock, `.env`/`.git` and phpMyAdmin probes, scanner user-agents, brute force on HTTP logins (401s and rejected POSTs) |
+| Windows | `.evtx`, `wevtutil` XML (UTF-8/16), Winlogbeat and flat JSON | RDP/SMB/Kerberos brute force and spraying, spraying with explicit credentials (4648), DCSync, Mimikatz, LSASS dumping (Sysmon 10, 4656/4663, comsvcs, procdump, rdrleakdiag, createdump), ntds.dit theft, Kerberoasting, log clearing, admin-group changes, suspicious services, PsExec (System 7045, Security 4697, admin-share 5145), shadow-copy deletion, Defender tampering, PowerShell `-enc`, download cradles and obfuscated `IEX` (4688, Sysmon 1, 4104 ScriptBlock) |
 | Any of the above | | IPs on your blocklist or threat feeds. Base64 payloads (UTF-8 and PowerShell UTF-16) are decoded and scanned again, and IPs hidden inside them are flagged as possible C2 |
 
 ---
@@ -197,7 +197,7 @@ file, exit codes and recipes for cron, CI and air-gapped machines.
 
 ## Detection rules
 
-All 59 detections are YAML files in [`owltriage/rules/`](owltriage/rules/). Each one carries its ATT&CK IDs
+All 65 detections are YAML files in [`owltriage/rules/`](owltriage/rules/). Each one carries its ATT&CK IDs
 and its own test cases:
 
 ```yaml
@@ -215,7 +215,7 @@ and its own test cases:
 
 ```bash
 owltriage rules list                              # what is loaded, by type
-owltriage rules test                              # run all 160+ examples
+owltriage rules test                              # run all 180+ examples
 owltriage hunt logs/*.log --rules-dir ./my-rules  # add, tune or disable rules
 ```
 
@@ -303,7 +303,7 @@ flowchart LR
     P --> CH[Discord / Slack] & TH[TheHive]
 ```
 
-Logs are streamed, so memory stays flat on large files. On one core with all 59 rules it reads roughly 25,000
+Logs are streamed, so memory stays flat on large files. On one core with all 65 rules it reads roughly 25,000
 text log lines or 9,000 EVTX records per second.
 
 ---

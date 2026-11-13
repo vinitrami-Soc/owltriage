@@ -40,10 +40,12 @@ _SSH_TAIL = r" from (?P<ip>\S+) port \d+"
 SSH_RULES = (
     ("auth_failure", re.compile(
         r"Failed (?:password|publickey|keyboard-interactive/pam|none) for "
-        r"(?:invalid user )?(?P<user>.*)" + _SSH_TAIL)),
+        r"(?:(?:invalid|illegal) user )?(?P<user>.*)" + _SSH_TAIL)),
     ("auth_success", re.compile(
         r"Accepted (?:password|publickey|keyboard-interactive/pam) for (?P<user>.*)" + _SSH_TAIL)),
-    ("auth_invalid_user", re.compile(r"Invalid user (?P<user>.*)" + _SSH_TAIL)),
+    # Older OpenSSH writes "Invalid user x from 1.2.3.4" (or "Illegal user") with no port. Anchored at
+    # the end and greedy, so the IP is still the last one on the line: the one sshd appended.
+    ("auth_invalid_user", re.compile(r"(?:Invalid|Illegal) user (?P<user>.*) from (?P<ip>\S+)(?: port \d+)?\s*$")),
 )
 SUDO_COMMAND = re.compile(r"\bsudo(?:\[\d+\])?:\s+(?P<user>\S+) : .*?\bCOMMAND=(?P<cmd>.*)$")
 

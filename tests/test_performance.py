@@ -50,3 +50,19 @@ def test_memory_does_not_grow_with_file_size(tmp_path):
         tracemalloc.stop()
     print(f"\npeak memory: 10k lines {peaks[0] / 1e6:.2f} MB, 40k lines {peaks[1] / 1e6:.2f} MB")
     assert peaks[1] < 2 * peaks[0]
+
+
+def test_a_flood_of_explicit_credential_logons_stays_linear(tmp_path):
+    """A busy domain controller can log tens of thousands of 4648 events in minutes; the spray check
+    must not rescan its window for every one of them."""
+    import json
+    lines = (json.dumps({"EventID": 4648, "ProviderName": "Microsoft-Windows-Security-Auditing",
+                         "TimeCreated": f"2026-11-09T04:00:{(i // 1000) % 60:02d}.{i % 1000:03d}Z",
+                         "SubjectUserName": "svc", "TargetUserName": f"user{i % 50}", "IpAddress": "10.0.0.5"})
+             for i in range(30_000))
+    path = tmp_path / "flood.ndjson"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    start = time.perf_counter()
+    result = analyze([path])
+    assert time.perf_counter() - start < 15                       # was over a minute before the fix
+    assert "win-explicit-credential-spray" in {f.rule_id for f in result.findings}

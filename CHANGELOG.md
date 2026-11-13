@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+Found by testing on public attack datasets (Hayabusa, Splunk attack_data, OTRF, OSSEC, fail2ban, Loghub).
+
+### Added
+- Windows: password spraying with explicit credentials (event 4648, ten or more accounts from one source
+  within 10 minutes), Mimikatz by binary name, PsExec / RemCom / PAExec in the Security log (4697 service
+  install, 5145 admin-share access), LSASS dumps with `createdump`.
+- Web: remote file inclusion (`?page=http://host/file?`), probes for phpMyAdmin and other admin panels,
+  and brute force on HTTP logins: 401 responses and rejected POSTs (403) count as failed logins.
+- Linux: `useradd` lines from SUSE, and old OpenSSH `Invalid user` / `Illegal user` lines without a port.
+- Rule detail templates accept `{FieldA|FieldB}`: the first field that has a value.
+
+### Fixed
+- A failed login logged a moment after a later one no longer lowers the brute-force count (five HTTP 401s
+  inside 4 seconds were seen as four).
+
 ## 2.0.0 (2026-11-12)
 
 Rebuilt for the wider blue team community, and renamed **OwlTriage**.

@@ -190,14 +190,19 @@ def test_window_count_is_exact_for_ordered_events(events, window):
     assert got == true_counts(events, window)
 
 
+def best_window(events, window):
+    """Reference: the most failures any real window of `window` seconds holds among these events."""
+    return max(sum(c for t2, c in events if t - window <= t2 <= t) for t, _ in events)
+
+
 @settings(max_examples=400, deadline=None)
 @given(failure_stream, st.integers(1, 900))
 def test_window_count_never_over_counts_in_any_order(events, window):
     analyzer = Analyzer(ruleset=RULES, window_seconds=window)
-    for (t, c), truth in zip(events, true_counts(events, window)):
+    for k, ((t, c), own) in enumerate(zip(events, true_counts(events, window))):
         got = analyzer._add_failures("x", float(t), c)
-        assert c <= got <= truth                                   # a false positive needs got > truth
-        assert analyzer._recent_failures("x", float(t)) <= truth
+        assert c <= got <= best_window(events[:k + 1], window)     # a false positive needs more than any window
+        assert analyzer._recent_failures("x", float(t)) <= own    # a login is only blamed on failures before it
 
 
 def test_progress_bar_follows_a_gzip_log(tmp_path):

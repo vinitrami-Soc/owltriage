@@ -6,9 +6,9 @@
   type: line
   severity: medium
   mitre: [T1136.001]
-  pattern: '\buseradd\[\d+\]: new user: name='
+  pattern: '\buseradd\[\d+\]: (?:new user: name=|new account added - account=)'
   tests:
-    match: ["Nov  9 03:13:00 web01 useradd[2430]: new user: name=support, UID=1002, GID=1002, home=/home/support, shell=/bin/bash"]
+    match: ["Nov  9 03:13:00 web01 useradd[2430]: new user: name=support, UID=1002, GID=1002, home=/home/support, shell=/bin/bash", "Sep 15 17:11:27 myserver useradd[13542]: new account added - account=fred, uid=1016, gid=100, home=/home/fred, shell=/bin/bash, by=0"]
     no_match: ["Nov  9 03:13:00 web01 useradd[2430]: new group: name=support, GID=1002"]
 
 - id: linux-sudo-group-add

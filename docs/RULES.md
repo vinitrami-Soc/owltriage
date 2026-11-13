@@ -60,7 +60,7 @@ single quotes so backslashes stay literal; write a literal `'` as `''`.
     fields:                                # optional; EVERY regex must match
       TargetUserName: '^(?:administrators|domain admins)$'
       # '*': 'regex'                       # special: matches if ANY field matches (unnamed <Data> events)
-  detail: "{MemberSid} added to {TargetUserName} by {SubjectUserName}"   # {Field} placeholders
+  detail: "{MemberSid} added to {TargetUserName} by {SubjectUserName}"   # {Field} placeholders; {A|B} = first one present
   tests:
     match:    [{event_id: 4732, TargetUserName: Administrators, MemberSid: S-1-5-21-1-1001}]
     no_match: [{event_id: 4732, TargetUserName: Remote Desktop Users}]
@@ -68,11 +68,13 @@ single quotes so backslashes stay literal; write a literal `'` as `''`.
 
 Field names are exactly the `<Data Name="...">` names of the event (or the `event_data`
 keys in Winlogbeat JSON). Test samples are mappings with `event_id`, optional `provider` /
-`channel`, and the fields. Windows writes `-` for empty fields; templates drop those.
+`channel`, and the fields. Windows writes `-` for empty fields; templates drop those. When the same
+value sits in different fields depending on the event (`ProcessName` in 4673, `Image` in Sysmon 1),
+write `{ProcessName|Image}`: the first field that has a value is used.
 
 ### Correlation rules
 
-The six built-ins live in [`correlation.yml`](../owltriage/rules/correlation.yml). Their
+The seven built-ins live in [`correlation.yml`](../owltriage/rules/correlation.yml). Their
 logic is in `detectors.py`; their numbers are yours to tune:
 
 | id | tunable keys |
@@ -80,6 +82,7 @@ logic is in `detectors.py`; their numbers are yours to tune:
 | `auth-brute-force` | `threshold`, `window_seconds`, `spraying_min_users`, `mitre_spraying` |
 | `auth-success-after-brute-force` | uses the brute-force threshold and window |
 | `encoded-payload` | `severity_command`, `title_command`, `mitre_command` |
+| `win-explicit-credential-spray` | `min_accounts`, `window_seconds` (event 4648: different accounts tried from one source) |
 | all | `severity`, `mitre`, `block`, `enabled` |
 
 ## Overriding packaged rules

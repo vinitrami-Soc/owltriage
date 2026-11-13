@@ -28,7 +28,8 @@ ATTACK_FILE = Path(__file__).resolve().parent / "resources" / "attack.yml"
 RULE_TYPES = ("web", "command", "line", "event", "correlation")
 WEB_FIELDS = ("path", "user_agent", "referrer")
 BUILTIN_CORRELATIONS = ("auth-brute-force", "auth-success-after-brute-force", "auth-success-from-bad-ip",
-                        "blocklist-match", "encoded-payload", "hidden-ip-in-payload")
+                        "blocklist-match", "encoded-payload", "hidden-ip-in-payload",
+                        "win-explicit-credential-spray")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
 NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,40}$")
 TECHNIQUE_RE = re.compile(r"^T\d{4}(?:\.\d{3})?$")
@@ -47,14 +48,18 @@ def load_techniques(path: Path = ATTACK_FILE) -> Dict[str, dict]:
         return yaml.safe_load(handle) or {}
 
 
-_TEMPLATE = re.compile(r"\{(\w+)\}")
+_TEMPLATE = re.compile(r"\{(\w+(?:\|\w+)*)\}")  # {Field} or {First|Fallback|...}
 
 
 def render_template(template: str, values: Dict[str, Any], limit: int = 80) -> str:
     """'{TargetUserName} by {SubjectUserName}' -> values. Plain substitution only: unlike
     str.format, a crafted template or value cannot reach object attributes."""
     def value(match) -> str:
-        text = values.get(match.group(1), "?")
+        names = match.group(1).split("|")
+        present = [values[n] for n in names if values.get(n) not in (None, "", "-")]
+        if present:
+            return clean(present[0], limit)
+        text = values.get(names[0], "?") if len(names) == 1 else "?"
         return "" if text in ("", "-") else clean(text, limit)  # Windows writes "-" for empty fields
     return re.sub(r"\s{2,}", " ", _TEMPLATE.sub(value, template)).strip()
 

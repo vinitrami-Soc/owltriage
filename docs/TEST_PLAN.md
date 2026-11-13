@@ -25,7 +25,7 @@ version, and when an external service misbehaves.
 
 | Layer | Where | What it proves |
 |---|---|---|
-| Rule self-tests | `owltriage/rules/*.yml` → `test_rules.py` | Each of the 53 regex/event rules matches its `match` examples and none of its `no_match` look-alikes (160+ examples); every rule has both kinds; ATT&CK IDs exist; invalid rules fail loudly with file + rule id |
+| Rule self-tests | `owltriage/rules/*.yml` → `test_rules.py` | Each of the 58 regex/event rules matches its `match` examples and none of its `no_match` look-alikes (180+ examples); every rule has both kinds; ATT&CK IDs exist; invalid rules fail loudly with file + rule id |
 | Unit | `test_log_parser.py`, `test_detectors.py`, `test_defense.py`, `test_pipeline.py` | Parsing, brute-force thresholds, compromise logic, web signatures, block-rule planning, API response parsing |
 | Windows | `test_windows.py` | wevtutil XML, UTF-16 exports, Winlogbeat/flat JSON, Kerberos 4768/4771 spraying, PowerShell 4104, Sysmon 3 outbound, UTF-16 `-enc` decoding, truncated XML, XML entity refusal, missing optional `evtx` package |
 | Time windows & feeds | `test_feeds_exporters.py` | Window boundaries, feed download (size cap, HTTP errors, HTML instead of a list, atomic write), private/huge ranges refused, prefix-index lookups equal a naive scan (Hypothesis) |
@@ -114,6 +114,41 @@ long dynamic runs instead of more line coverage.
 | `--threshold 0`, negative `--window` | Input-class probing | Silently clamped |
 | IPv6 only in `full_log` | Code review | Never enriched |
 | Progress bar used the compressed size of `.gz` logs | PTY run | Bar stuck at 98 % for most of the hunt |
+
+## Validation on public datasets
+
+The detections were run on logs the tool had never seen: 15 Windows recordings from the
+[Hayabusa sample EVTX](https://github.com/Yamato-Security/hayabusa-sample-evtx) set (DeepBlueCLI,
+Yamato Security, EVTX-to-MITRE-Attack), 15 files from [Splunk attack_data](https://github.com/splunk/attack_data)
+(checksums verified against their Git LFS pointers), 4 [OTRF Security-Datasets](https://github.com/OTRF/Security-Datasets)
+recordings, sections of the [OSSEC log samples](https://github.com/ossec/ossec-docs), access logs from
+[fail2ban's test files](https://github.com/fail2ban/fail2ban), the [Loghub](https://github.com/logpai/loghub) OpenSSH
+sample and 10,000 ordinary requests from [Elastic's apache_logs](https://github.com/elastic/examples). Each file
+was labelled with the attack it records before the run.
+
+| Platform | Caught before | Caught after | Notes |
+|---|---|---|---|
+| Windows (attack recordings the tool can read) | 15 of 19 | **19 of 19** | Added: spraying with explicit credentials (4648), Mimikatz by binary name, PsExec in the Security log (4697, 5145), createdump LSASS dumps |
+| Linux | 4 of 5 | **5 of 5** | Added: SUSE `useradd`, old OpenSSH lines without a port |
+| Web | 3 of 5 | **6 of 8** | Added: remote file inclusion, admin-panel probes, brute force on HTTP logins. Missed: 4 POSTs (under the threshold of 5) and an OSSEC sample with an anonymised, reordered line |
+| Ordinary traffic (10 files, incl. 10,000 web requests) | no high alerts | **no new alerts** | 2 low notes on base64 in URLs, as before |
+
+Mutation testing on the new code injected 11 bugs; 10 are caught, and the 11th (a non-greedy username
+in the old-OpenSSH pattern) changes nothing, because the end-of-line anchor already pins the IP.
+
+The same comparison on all 278 EVTX-ATTACK-SAMPLES files, the OTRF recordings, the Loghub sample
+and the demo only **added** findings (Mimikatz in two recordings, RemCom and PsExec share access),
+each checked against the file it came from; no earlier finding disappeared.
+
+Not covered yet: Splunk's own key=value export of Windows events (3 files), AS-REP roasting,
+PowerShell v2 downgrade, BITS jobs, `doas`, Linux discovery commands, spam bots and malformed requests.
+The AIT Log Data Set (Zenodo) and SecRepo could not be downloaded from the test environment.
+
+| Bug found by the datasets | Impact | Fix |
+|---|---|---|
+| Five 401s inside 4 seconds, one logged a moment late, peaked at 4 | Missed brute force on fail2ban's traefik sample | The brute-force count is the whole current window, which only ever holds failures within the window of each other |
+| Mimikatz detail read `???C:\...\mimikatz.exe (??)` | Unreadable finding | Templates take `{ProcessName\|Image\|SourceImage}`: the first field present |
+| The new 4648 spray check rescanned its window for every event | 30,000 events in one window took 54 s, 100,000 about 10 minutes (found while reviewing the change) | A running count per source: 100,000 events in 0.3 s; `test_a_flood_of_explicit_credential_logons_stays_linear` |
 
 ## Known gaps
 

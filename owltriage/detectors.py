@@ -31,7 +31,7 @@ from .windows import SourceError
 
 SERVICE_LABEL = {"ssh": "SSH", "rdp": "RDP", "network": "Windows network logon", "interactive": "Windows logon",
                  "windows": "Windows logon", "cached": "Windows cached logon", "unlock": "Windows unlock",
-                 "kerberos": "Kerberos"}
+                 "kerberos": "Kerberos", "http": "HTTP"}
 
 
 @dataclass
@@ -196,6 +196,7 @@ class Analyzer:
         self.blocklist_rule = self.rules.correlation("blocklist-match")
         self.encoded = self.rules.correlation("encoded-payload")
         self.hidden_ip = self.rules.correlation("hidden-ip-in-payload")
+        self.explicit_spray = self.rules.correlation("win-explicit-credential-spray")
 
         brute = self.brute
         self.threshold = max(1, int(brute_threshold if brute_threshold is not None
@@ -203,6 +204,9 @@ class Analyzer:
         window = window_seconds if window_seconds is not None else (brute.param("window_seconds", 600) if brute else 0)
         self.window = max(0, int(window or 0))
         self.spray_min = int(brute.param("spraying_min_users", 3)) if brute else 3
+        spray = self.explicit_spray
+        self.explicit_min_accounts = max(2, int(spray.param("min_accounts", 10))) if spray else 10
+        self.explicit_window = max(1, int(spray.param("window_seconds", 600))) if spray else 600
 
         self.result = AnalysisResult(blocklist_size=len(self.bad_ips),
                                      rules_loaded=len(self.rules.enabled()))
@@ -212,6 +216,10 @@ class Analyzer:
         self._fail_users: Dict[str, Set[str]] = defaultdict(set)
         self._fail_services: Dict[str, Counter] = defaultdict(Counter)
         self._brute_hits: Dict[str, dict] = {}
+        self._explicit: Dict[str, deque] = defaultdict(deque)  # 4648 per source: (epoch, account), oldest first
+        self._explicit_accounts: Dict[str, Counter] = defaultdict(Counter)  # accounts in that deque
+        self._explicit_newest: Dict[str, float] = {}
+        self._explicit_hits: Dict[str, dict] = {}
         self._outbound: Set[str] = set()
         self._inbound: Set[str] = set()
 
@@ -261,17 +269,22 @@ class Analyzer:
             self._on_successful_login(event)
         elif event.kind == "http_request":
             self._check_web(event)
+            if event.status == 401 or (event.status == 403 and event.method == "POST"):
+                self._on_failed_login(event)  # a login page or basic auth said no
         if event.command:
             self._check_command(event.command, event)
         if event.log_type == "text" and event.kind != "http_request":
             self._check_lines(event)
         if event.event_id is not None:
             self._check_events(event)
+            if event.event_id == 4648 and event.log_type == "windows":
+                self._on_explicit_logon(event)
         self._check_encoded(event)
 
     def finish(self) -> AnalysisResult:
         self._check_blocklist()
         self._report_brute_force()
+        self._report_explicit_spray()
         self.result.findings = self._findings.sorted()
         return self.result
 
@@ -301,8 +314,10 @@ class Analyzer:
         return sum(count for epoch, count in self._fail_times[ip] if now - self.window <= epoch <= now)
 
     def _add_failures(self, ip: str, epoch: Optional[float], count: int) -> int:
-        """Record failures as one (epoch, count) pair and return how many fall in the window ending at
-        `epoch`. Later events never count for earlier ones, so files read newest-first stay correct."""
+        """Record failures as one (epoch, count) pair and return how many are in the current window.
+        Entries older than the newest one minus the window are dropped, and a jump back in time starts
+        afresh, so the total is always a real window: files read newest-first are never mixed, and a
+        line logged a moment late still counts with its neighbours."""
         if not self.window or epoch is None:
             return self.result.failed_by_ip[ip]
         times = self._fail_times[ip]
@@ -319,12 +334,7 @@ class Analyzer:
         self._fail_sum[ip] += count
         while times[0][0] < times[-1][0] - self.window:
             self._fail_sum[ip] -= times.popleft()[1]
-        later = 0
-        for when, n in reversed(times):
-            if when <= epoch:
-                break
-            later += n
-        return self._fail_sum[ip] - later
+        return self._fail_sum[ip]
 
     def _on_failed_login(self, event: LogEvent) -> None:
         ip = event.ip
@@ -372,6 +382,46 @@ class Analyzer:
             detail = f"{counted} against {len(users)} account(s): {shown}"
             mitre = self.brute.param("mitre_spraying", self.brute.mitre) if spraying else self.brute.mitre
             self._finding(self.brute, hit["event"], title, ip=ip, detail=detail, mitre=list(mitre))
+
+    def _on_explicit_logon(self, event: LogEvent) -> None:
+        """Event 4648: count the different accounts one source tries inside the window."""
+        fields = event.fields or {}
+        account = clean(fields.get("TargetUserName"), 64).lower()
+        if not self.explicit_spray or account in ("", "-"):
+            return
+        source = event.ips[0] if event.ips else None
+        key = source or f"{clean(fields.get('SubjectUserName'), 64)}@{event.host or '?'}"
+        seen, accounts, now = self._explicit[key], self._explicit_accounts[key], event.epoch
+        newest = self._explicit_newest.get(key)
+        if now is not None and newest is not None and now < newest - self.explicit_window:
+            seen.clear()  # an older file read after a newer one: never mix the two
+            accounts.clear()
+            newest = None
+        seen.append((now, account))
+        accounts[account] += 1
+        if now is not None:
+            newest = now if newest is None else max(newest, now)
+            self._explicit_newest[key] = newest
+            while seen and seen[0][0] is not None and seen[0][0] < newest - self.explicit_window:
+                _, old = seen.popleft()
+                accounts[old] -= 1
+                if not accounts[old]:
+                    del accounts[old]
+        # Like the brute-force window: everything kept is within the window of the newest attempt.
+        if len(accounts) >= self.explicit_min_accounts:
+            hit = self._explicit_hits.setdefault(key, {"event": event, "ip": source, "peak": 0, "accounts": set(),
+                                                       "subject": clean(fields.get("SubjectUserName"), 40)})
+            if len(accounts) > hit["peak"]:
+                hit["peak"] = len(accounts)
+                hit["accounts"] = set(accounts)
+
+    def _report_explicit_spray(self) -> None:
+        for hit in self._explicit_hits.values():
+            names = sorted(hit["accounts"])
+            shown = ", ".join(names[:6]) + (" …" if len(names) > 6 else "")
+            detail = (f"{hit['peak']} accounts tried with explicit credentials within "
+                      f"{self.explicit_window // 60} min by '{hit['subject']}': {shown}")
+            self._finding(self.explicit_spray, hit["event"], ip=hit["ip"], detail=detail)
 
     # -- blocklist / threat feeds ------------------------------------------------
     def _check_blocklist(self) -> None:

@@ -33,7 +33,7 @@ def test_every_finding_rule_maps_to_attack_except_blocklist():
 def test_correlation_rules_are_all_present():
     assert {r.id for r in RULESET.rules.values() if r.type == "correlation"} == {
         "auth-brute-force", "auth-success-after-brute-force", "auth-success-from-bad-ip",
-        "blocklist-match", "encoded-payload", "hidden-ip-in-payload"}
+        "blocklist-match", "encoded-payload", "hidden-ip-in-payload", "win-explicit-credential-spray"}
 
 
 BASE = {"id": "web-test", "name": "TEST", "title": "t", "type": "web", "severity": "high",
@@ -101,6 +101,13 @@ def test_detail_templates_cannot_reach_python_internals():
     assert render_template("{TargetUserName} {__class__} {0.__class__}", {"TargetUserName": "bob"}) == \
         "bob ? {0.__class__}"
     assert render_template("{A} {B} by {C}", {"A": "-", "B": "x", "C": "y"}) == "x by y"
+
+
+def test_template_alternatives_use_the_first_field_present():
+    values = {"Image": "C:\\t\\mimikatz.exe", "User": "bob"}
+    assert render_template("{ProcessName|Image} ({SubjectUserName|User})", values) == "C:\\t\\mimikatz.exe (bob)"
+    assert render_template("{ProcessName|Image}", {}) == "?"
+    assert render_template("{ProcessName|Image}", {"ProcessName": "a.exe", "Image": "b.exe"}) == "a.exe"  # first wins
 
 
 def test_rule_regexes_have_bounded_input():

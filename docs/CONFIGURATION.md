@@ -61,7 +61,7 @@ covers the older days too. Files can be given in any order; a syslog file that c
 | `--feeds-dir DIR` | `~/.cache/owltriage/feeds` | Where downloaded threat feeds are read from (see [environment variables](#environment-variables)). |
 | `--no-feeds` | off | Don't load downloaded threat feeds for this run. |
 | `--rules-dir DIR` | none | Extra YAML rules, or overrides of built-in rules by `id`. Repeatable. |
-| `--threshold N` | `5` (from the rule) | Failed logins from one IP that count as brute force (1 or more). Overrides the `auth-brute-force` rule for this run. |
+| `--threshold N` | `5` (from the rule) | Failed logins from one IP that count as brute force (1 or more): SSH, RDP, Windows and Kerberos failures, and web requests answered 401 or rejected POSTs (403). Overrides the `auth-brute-force` rule for this run. |
 | `--window SECONDS` | `600` (from the rule) | Time window for the threshold (0 or more). `0` counts across the whole file. |
 | `--year YYYY` | current year | Year to assume for syslog timestamps, which have none. Set it when hunting last year's logs. |
 | `--allow IP_OR_CIDR` | none | Never write a block rule for this address or range (your VPN, office, scanners you run). Repeatable. |
@@ -195,7 +195,7 @@ These apply to every command.
 
 ## Detection rules
 
-The 59 built-in rules live in [`owltriage/rules/`](../owltriage/rules/). To add rules or change built-in
+The 65 built-in rules live in [`owltriage/rules/`](../owltriage/rules/). To add rules or change built-in
 ones without forking, put YAML files in a directory and pass it with `--rules-dir`. A rule whose `id` already
 exists only changes the keys you set:
 
