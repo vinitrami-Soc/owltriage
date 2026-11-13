@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 (2026-11-13)
 
 Found by testing on public attack datasets (Hayabusa, Splunk attack_data, OTRF, OSSEC, fail2ban, Loghub).
 

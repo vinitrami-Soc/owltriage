@@ -115,7 +115,7 @@ long dynamic runs instead of more line coverage.
 | IPv6 only in `full_log` | Code review | Never enriched |
 | Progress bar used the compressed size of `.gz` logs | PTY run | Bar stuck at 98 % for most of the hunt |
 
-## Validation on public datasets
+## Validation on public datasets (v2.1.0)
 
 The detections were run on logs the tool had never seen: 15 Windows recordings from the
 [Hayabusa sample EVTX](https://github.com/Yamato-Security/hayabusa-sample-evtx) set (DeepBlueCLI,

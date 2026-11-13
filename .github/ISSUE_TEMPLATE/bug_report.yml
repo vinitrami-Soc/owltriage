@@ -27,6 +27,6 @@ body:
     id: env
     attributes:
       label: owltriage version, Python version, OS
-      placeholder: owltriage 2.0.0, Python 3.12, Ubuntu 24.04
+      placeholder: owltriage 2.1.0, Python 3.12, Ubuntu 24.04
     validations:
       required: true
