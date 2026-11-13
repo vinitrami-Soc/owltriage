@@ -6,7 +6,7 @@ FROM python:3.12-slim
 WORKDIR /src
 COPY pyproject.toml README.md LICENSE ./
 COPY owltriage ./owltriage
-RUN pip install --no-cache-dir ".[evtx]" && useradd --create-home --uid 10001 triage
+RUN pip install --no-cache-dir . && useradd --create-home --uid 10001 triage
 USER triage
 WORKDIR /work
 ENTRYPOINT ["owltriage"]

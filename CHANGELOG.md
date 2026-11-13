@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Native `.evtx` reading is part of the normal install: `pip install owltriage` brings the `evtx` package on
+  Linux (x86-64, ARM64), macOS and 64-bit Windows, so the `[evtx]` extra is no longer needed (it still works).
+  On hardware without an `evtx` wheel (32-bit ARM, Windows on ARM) owltriage still installs and reads
+  `wevtutil` XML exports; the warning for `.evtx` files there says so.
+
 ## 2.1.0 (2026-11-13)
 
 Found by testing on public attack datasets (Hayabusa, Splunk attack_data, OTRF, OSSEC, fail2ban, Loghub).

@@ -12,7 +12,7 @@ Thanks for helping defenders! The most valuable contributions, in order:
 git clone https://github.com/vinitrami-Soc/owltriage.git
 cd owltriage
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev,evtx]"
+pip install -e ".[dev]"
 
 owltriage hunt --demo          # sanity check
 owltriage rules test           # every rule's examples

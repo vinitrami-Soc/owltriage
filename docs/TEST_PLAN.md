@@ -5,7 +5,7 @@
 ## Run it
 
 ```bash
-pip install -e ".[dev,evtx]"
+pip install -e ".[dev]"
 owltriage rules test                     # every rule's match / no_match examples
 python -m pytest -q                       # full suite (~50 s)
 python -m pytest --cov=owltriage         # with coverage

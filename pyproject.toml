@@ -28,10 +28,13 @@ dependencies = [
     "python-dotenv>=1.0",
     "PyYAML>=6.0",
     "defusedxml>=0.7",
+    # Native .evtx reading, wherever the evtx package ships a ready-made wheel. Elsewhere (32-bit ARM,
+    # Windows on ARM, ...) owltriage still installs and reads wevtutil XML exports instead.
+    "evtx>=0.8; sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine == 'AMD64')",
 ]
 
 [project.optional-dependencies]
-evtx = ["evtx>=0.8"]
+evtx = ["evtx>=0.8"]  # kept so `owltriage[evtx]` from older instructions keeps working
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "hypothesis>=6.0", "ruff>=0.4", "stix2>=3.0"]
 
 [project.scripts]

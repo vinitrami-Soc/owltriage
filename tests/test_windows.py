@@ -133,7 +133,7 @@ def test_evtx_without_optional_package_gives_install_hint(tmp_path, monkeypatch)
 
     monkeypatch.setattr(builtins, "__import__", no_evtx)
     result = analyze([fake])
-    assert any("pip install 'owltriage[evtx]'" in w for w in result.warnings)
+    assert any("pip install evtx" in w and "wevtutil" in w for w in result.warnings)
 
 
 def test_corrupt_evtx_is_a_warning():

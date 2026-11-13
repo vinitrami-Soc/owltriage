@@ -46,7 +46,7 @@ owltriage hunt /var/log/auth.log /var/log/nginx/access.log Security.evtx
 |---|---|
 | Syslog text | `/var/log/auth.log`, `/var/log/secure`, `/var/log/syslog` |
 | Web access logs | Apache / Nginx combined format |
-| Windows `.evtx` | `Security.evtx`, `Sysmon/Operational.evtx` (needs the `[evtx]` extra) |
+| Windows `.evtx` | `Security.evtx`, `Sysmon/Operational.evtx` (read natively on Linux x86-64/ARM64, macOS and 64-bit Windows) |
 | Windows XML | `wevtutil qe Security /f:xml > security.xml` (UTF-8 or UTF-16) |
 | JSON lines | Winlogbeat / Elastic (`winlog.*`) or flat events with `EventID`; non-Windows lines are read as text |
 

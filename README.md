@@ -31,17 +31,18 @@ You need Python 3.9 or newer on Linux, macOS or Windows.
 **1. Install**
 
 ```bash
-pipx install "owltriage[evtx] @ git+https://github.com/vinitrami-Soc/owltriage"
+pipx install git+https://github.com/vinitrami-Soc/owltriage
 ```
 
 No pipx? Use a virtual environment:
 
 ```bash
 python3 -m venv ~/.venvs/owltriage && . ~/.venvs/owltriage/bin/activate
-pip install "owltriage[evtx] @ git+https://github.com/vinitrami-Soc/owltriage"
+pip install git+https://github.com/vinitrami-Soc/owltriage
 ```
 
-The `[evtx]` extra adds native `.evtx` support. Leave it out if you only read text logs.
+Everything it needs comes with it, including native `.evtx` reading on Linux (x86-64 and ARM64), macOS and
+64-bit Windows. On other hardware (32-bit ARM, Windows on ARM) it still installs and reads `wevtutil` XML exports.
 
 **2. See it work on the bundled attack story** (Linux + web + Windows, no setup)
 
@@ -60,7 +61,7 @@ owltriage hunt Security.evtx Microsoft-Windows-Sysmon%4Operational.evtx
 that folder are described under [Outputs](#outputs).
 
 <details>
-<summary>Other ways to run it (from a checkout, Docker, Windows without the evtx package)</summary>
+<summary>Other ways to run it (from a checkout, Docker, systems without native .evtx reading)</summary>
 
 From a source checkout, without installing:
 
@@ -81,7 +82,8 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" owltriage hunt auth.l
 Logs that only root can read, such as `/var/log/auth.log`, need copying into the folder first:
 `sudo cp /var/log/auth.log . && sudo chown "$USER" auth.log`.
 
-Windows without the `evtx` package: export the log to XML first and hunt that.
+On hardware without native `.evtx` reading (32-bit ARM, Windows on ARM): export the log to XML on the
+Windows machine first and hunt that.
 
 ```bash
 wevtutil qe Security /f:xml > security.xml

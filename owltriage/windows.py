@@ -1,7 +1,7 @@
 """Windows event logs: wevtutil XML exports, .evtx files and JSON lines (Winlogbeat or flat).
 
     wevtutil qe Security /f:xml > security.xml        # export on the Windows box
-    owltriage hunt security.xml                       # or Security.evtx with `pip install owltriage[evtx]`
+    owltriage hunt security.xml                       # or Security.evtx directly (evtx comes with the install)
 
 All XML goes through defusedxml (no DTDs, entity expansion or external
 entities): event logs are attacker-influenced input.
@@ -236,8 +236,9 @@ def iter_evtx(path) -> Iterator[LogEvent]:
         from evtx import PyEvtxParser
     except ImportError:
         raise SourceError(
-            f"{path.name}: reading .evtx needs the optional 'evtx' package: pip install 'owltriage[evtx]'. "
-            "Or export on Windows with: wevtutil qe Security /f:xml > security.xml") from None
+            f"{path.name}: reading .evtx needs the 'evtx' package, which owltriage installs on Linux (x86-64, "
+            "ARM64), macOS and 64-bit Windows: pip install evtx. Where it is not available, export the log on "
+            "Windows with: wevtutil qe Security /f:xml > security.xml") from None
     try:
         parser = PyEvtxParser(str(path))
     except Exception as exc:  # the Rust parser raises its own error types

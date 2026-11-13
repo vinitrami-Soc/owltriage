@@ -4,5 +4,4 @@ requests>=2.31
 python-dotenv>=1.0
 PyYAML>=6.0
 defusedxml>=0.7
-# optional, for reading .evtx files directly:
-# evtx>=0.8
+evtx>=0.8; sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')) or (sys_platform == 'win32' and platform_machine == 'AMD64')
