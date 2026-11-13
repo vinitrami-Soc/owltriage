@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- Windows: ntds.dit theft through Windows Server Backup. `wbadmin` backing up or restoring the AD database by
+  name (`-include:` / `-items:` naming `ntds.dit`) now raises `cmd-ntds-dump`. This is the step Akira used in
+  The DFIR Report's June 2026 case, and the one a replay of 2026 ransomware playbooks missed. Routine
+  `wbadmin start systemstatebackup` jobs are not flagged.
+
 ### Changed
 - Native `.evtx` reading is part of the normal install: `pip install owltriage` brings the `evtx` package on
   Linux (x86-64, ARM64), macOS and 64-bit Windows, so the `[evtx]` extra is no longer needed (it still works).

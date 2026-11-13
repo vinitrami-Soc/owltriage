@@ -226,10 +226,11 @@
   type: command
   severity: critical
   mitre: [T1003.003]
-  pattern: '\bntdsutil(?:\.exe)?\b.{0,150}\bifm\b|\b(?:copy|xcopy|robocopy|esentutl)\b.{0,200}\\ntds\.dit\b'
+  pattern: '\bntdsutil(?:\.exe)?\b.{0,150}\bifm\b|\b(?:copy|xcopy|robocopy|esentutl)\b.{0,200}\\ntds\.dit\b|\bwbadmin(?:\.exe)?\b.{0,300}\bntds\.dit\b'
+  false_positives: ["A domain controller backup job that names ntds.dit itself (system-state backups do not)"]
   tests:
-    match: ["ntdsutil \"ac i ntds\" \"ifm\" \"create full c:\\temp\" q q", "copy \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\NTDS\\ntds.dit C:\\temp\\ntds.dit"]
-    no_match: ["ntdsutil \"metadata cleanup\""]
+    match: ["ntdsutil \"ac i ntds\" \"ifm\" \"create full c:\\temp\" q q", "copy \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\NTDS\\ntds.dit C:\\temp\\ntds.dit", "wbadmin start backup -backupTarget:\\\\10.0.0.9\\b -include:C:\\Windows\\NTDS\\NTDS.dit -quiet"]
+    no_match: ["ntdsutil \"metadata cleanup\"", "wbadmin start systemstatebackup -backupTarget:E: -quiet"]
 
 - id: cmd-schtasks-create
   name: PERSISTENCE
