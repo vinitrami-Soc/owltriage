@@ -11,19 +11,24 @@ Packaged rules live in owltriage/rules/. Extra directories (`--rules-dir`) are
 merged on top: a rule with an existing `id` updates only the keys it sets, so
 `{id: auth-brute-force, threshold: 10}` or `{id: web-xss, enabled: false}` is
 all it takes to tune or disable a rule. See docs/RULES.md.
+
+owltriage/rules/VERSION dates the built-in rules; a signed rules pack (rulepack.py)
+replaces them only when it is newer.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
 
 from .utils import SEVERITIES, clean
 
 PACKAGED_RULES = Path(__file__).resolve().parent / "rules"
+RULES_ENGINE = 1  # rule syntax this code reads; bump when an older owltriage could not load the new rules
 ATTACK_FILE = Path(__file__).resolve().parent / "resources" / "attack.yml"
 RULE_TYPES = ("web", "command", "line", "event", "correlation")
 WEB_FIELDS = ("path", "user_agent", "referrer")
@@ -219,18 +224,48 @@ def _rule_files(directory: Path) -> List[Path]:
     return sorted(p for p in Path(directory).rglob("*") if p.suffix in (".yml", ".yaml") and p.is_file())
 
 
-def _read_rule_file(path: Path) -> List[Dict[str, Any]]:
+def _parse_rules(text: str, where: str) -> List[Dict[str, Any]]:
     try:
-        with path.open(encoding="utf-8") as handle:
-            data = yaml.safe_load(handle)  # safe_load: rule files never execute code
+        data = yaml.safe_load(text)  # safe_load: rule files never execute code
     except yaml.YAMLError as exc:
-        raise RuleError(f"{path}: invalid YAML: {exc}") from None
+        raise RuleError(f"{where}: invalid YAML: {exc}") from None
     if data is None:
         return []
     items = data if isinstance(data, list) else [data]
     if not all(isinstance(item, dict) for item in items):
-        raise RuleError(f"{path}: expected a rule mapping or a list of rule mappings")
+        raise RuleError(f"{where}: expected a rule mapping or a list of rule mappings")
     return items
+
+
+def _read_rule_file(path: Path) -> List[Dict[str, Any]]:
+    return _parse_rules(path.read_text(encoding="utf-8"), str(path))
+
+
+def packaged_rule_texts(directory: Path = PACKAGED_RULES) -> Dict[str, str]:
+    return {path.name: path.read_text(encoding="utf-8") for path in _rule_files(directory)}
+
+
+def rules_digest(files: Mapping[str, str]) -> str:
+    """Fingerprint of a set of rule files; Windows line endings (a git checkout there) do not change it."""
+    digest = hashlib.sha256()
+    for name in sorted(files):
+        digest.update(name.encode("utf-8") + b"\0" + files[name].replace("\r\n", "\n").encode("utf-8") + b"\0")
+    return "sha256:" + digest.hexdigest()
+
+
+def version_key(version: str) -> Tuple[int, ...]:
+    """'2026.11.21.2' -> (2026, 11, 21, 2), so versions compare by date, then by counter."""
+    return tuple(int(part) for part in version.split("."))
+
+
+def builtin_rules_version(directory: Path = PACKAGED_RULES) -> Tuple[str, str]:
+    """(version, digest) from owltriage/rules/VERSION."""
+    values = {}
+    for line in (directory / "VERSION").read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.partition(":")
+        if sep and not key.lstrip().startswith("#"):
+            values[key.strip()] = value.strip()
+    return values["version"], values["digest"]
 
 
 @dataclass
@@ -249,17 +284,20 @@ class RuleSet:
         return (self.techniques.get(technique) or {}).get("name", technique)
 
 
-def load_rules(extra_dirs: Sequence = (), packaged_dir: Path = PACKAGED_RULES) -> RuleSet:
+def load_rules(extra_dirs: Sequence = (), packaged_dir: Path = PACKAGED_RULES,
+               packaged_texts: Optional[Mapping[str, str]] = None) -> RuleSet:
+    """Built-in rules (or `packaged_texts`, {file name: YAML}, e.g. from a rules pack), then `extra_dirs` on top."""
     techniques = load_techniques()
     raw: Dict[str, Dict[str, Any]] = {}
     origins: Dict[str, str] = {}
-    for path in _rule_files(packaged_dir):
-        for item in _read_rule_file(path):
+    texts = packaged_texts if packaged_texts is not None else packaged_rule_texts(packaged_dir)
+    for name in sorted(texts):
+        for item in _parse_rules(texts[name], name):
             rid = item.get("id")
             if rid in raw:
-                raise RuleError(f"{path.name}: duplicate rule id {rid!r} (also in {origins[rid]})")
+                raise RuleError(f"{name}: duplicate rule id {rid!r} (also in {origins[rid]})")
             raw[rid] = dict(item)
-            origins[rid] = path.name
+            origins[rid] = name
     for directory in extra_dirs:
         folder = Path(directory)
         if not folder.is_dir():

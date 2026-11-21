@@ -3,6 +3,7 @@
     owltriage hunt --demo                       # try it: bundled Linux, web and Windows attack samples
     owltriage hunt /var/log/auth.log access.log Security.evtx
     owltriage update-feeds                      # download free threat feeds (optional, cron daily)
+    owltriage update-rules                      # newest signed detection rules, no reinstall needed
     owltriage rules list | rules test           # detection-as-code
     owltriage alert --demo                      # Wazuh alert -> VirusTotal/AbuseIPDB -> Discord/Slack/TheHive
 """
@@ -22,7 +23,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from . import __version__
+from . import __version__, rulepack
 from .config import load_settings
 from .defense import parse_allowlist, plan_blocks, write_script
 from .banner import HuntProgress, OwlShow, animation_mode, print_logo
@@ -32,7 +33,7 @@ from .feeds import default_feeds_dir, load_feed_specs, load_feeds_into, update_f
 from .intel import BadIPList
 from .pipeline import TriagePipeline, load_alerts, report_summary
 from .reporting import make_console, render_alert, render_hunt, write_json_report, write_text_report
-from .rules import RuleError, load_rules, run_rule_tests
+from .rules import RuleError, builtin_rules_version, run_rule_tests, version_key
 from .summary import summarize
 from .utils import SEVERITIES, SEVERITY_RANK, clean
 
@@ -60,7 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,  # keep the docs URL on one line
         description="ATT&CK-mapped log hunting (Linux, web, Windows) and alert enrichment for blue teams.",
         epilog="Every option, setting and output file: https://github.com/vinitrami-Soc/owltriage/blob/main/docs/CONFIGURATION.md")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--version", action="version",
+                        version=f"%(prog)s {__version__} (built-in rules {builtin_rules_version()[0]})")
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     def common(p, svg: bool = True):
@@ -117,6 +119,15 @@ def build_parser() -> argparse.ArgumentParser:
     feeds.add_argument("--only", action="append", default=[], metavar="ID", help="update only this feed (repeatable)")
     feeds.add_argument("--list", action="store_true", help="show configured feeds and cache status, download nothing")
     feeds.add_argument("--quiet", action="store_true", help="print only failures, to stderr (for cron)")
+
+    upd = sub.add_parser("update-rules", help="install the newest signed detection rules (no reinstall needed)")
+    source = upd.add_mutually_exclusive_group()
+    source.add_argument("--file", type=Path, metavar="PACK",
+                        help="install a pack downloaded on another machine (for offline networks)")
+    source.add_argument("--url", help=f"where to download the pack (default: {rulepack.DEFAULT_PACK_URL})")
+    upd.add_argument("--check", action="store_true", help="only say whether newer rules exist; install nothing")
+    upd.add_argument("--rollback", action="store_true", help="go back to the previous pack, or to the built-in rules")
+    upd.add_argument("--quiet", action="store_true", help="print only problems, to stderr (for cron)")
     return parser
 
 
@@ -144,12 +155,16 @@ def _writable_out_dir(out_dir: Path, err: Console) -> bool:
     return True
 
 
-def _load_rules(args, err: Console):
+def _load_rules(args, err: Console) -> Optional[rulepack.ActiveRules]:
+    """The rules in use: an installed signed pack if newer than the built-in rules, plus --rules-dir on top."""
     try:
-        return load_rules(args.rules_dir)
+        active = rulepack.load_active_rules(getattr(args, "rules_dir", ()))
     except RuleError as exc:
         err.print(Text(f"Rule error: {exc}", style="bold red"))
         return None
+    if active.note:
+        err.print(Text(active.note, style="yellow"))
+    return active
 
 
 def cmd_hunt(args, console: Console, err: Console) -> int:
@@ -180,9 +195,10 @@ def cmd_hunt(args, console: Console, err: Console) -> int:
     except ValueError as exc:
         err.print(Text(f"Invalid --allow value: {exc}", style="bold red"))
         return 2
-    ruleset = _load_rules(args, err)
-    if ruleset is None or not _writable_out_dir(args.out_dir, err):
+    active = _load_rules(args, err)
+    if active is None or not _writable_out_dir(args.out_dir, err):
         return 2
+    ruleset = active.ruleset
 
     # The owl: animated on an interactive terminal only (never for pipes, cron, CI, --quiet, --svg).
     show = OwlShow(console, animation_mode(console, wanted=not (args.no_anim or args.quiet or args.svg)))
@@ -282,14 +298,16 @@ def cmd_alert(args, console: Console, err: Console) -> int:
 
 
 def cmd_rules(args, console: Console, err: Console) -> int:
-    ruleset = _load_rules(args, err)
-    if ruleset is None:
+    active = _load_rules(args, err)
+    if active is None:
         return 2
+    ruleset = active.ruleset
     if args.action == "list":
         rules = sorted((r for r in ruleset.rules.values() if not args.type or r.type == args.type),
                        key=lambda r: (r.type, r.id))
         title = f"{len(rules)} {args.type + ' ' if args.type else ''}rule{'' if len(rules) == 1 else 's'}"
-        table = Table(box=box.SIMPLE_HEAVY, title=title, title_style="bold", pad_edge=False)
+        table = Table(box=box.SIMPLE_HEAVY, title=title, title_style="bold", pad_edge=False,
+                      caption=active.label, caption_style="dim")
         table.add_column("id", no_wrap=True)
         table.add_column("severity", no_wrap=True)
         table.add_column("ATT&CK", no_wrap=True)              # one technique per line keeps it narrow
@@ -357,6 +375,56 @@ def cmd_update_feeds(args, console: Console, err: Console) -> int:
     return 1 if attempted and all(r.status == "failed" for r in attempted) else 0
 
 
+def _describe(active: rulepack.ActiveRules) -> str:
+    return f"the signed rules pack {active.version}" if active.source == "pack" else f"the built-in rules {active.version}"
+
+
+def cmd_update_rules(args, console: Console, err: Console) -> int:
+    say = (lambda *_: None) if args.quiet else console.print
+    if args.rollback:
+        if args.check or args.file or args.url:
+            err.print(Text("--rollback cannot be combined with --check, --file or --url", style="bold red"))
+            return 2
+        undone = rulepack.rollback()
+        active = _load_rules(args, err)
+        if active is None:
+            return 2
+        say(f"Rolled back: now using {_describe(active)}." if undone else
+            f"Nothing to roll back: using {_describe(active)}.")
+        return 0
+    try:
+        data = args.file.read_bytes() if args.file else rulepack.fetch_pack(args.url or rulepack.default_pack_url())
+    except OSError as exc:
+        err.print(Text(f"Can't read {args.file}: {exc.strerror or exc}", style="bold red"))
+        return 2
+    except rulepack.PackError as exc:
+        err.print(Text(f"Could not download the rules pack: {exc}. Nothing was changed.", style="bold red"))
+        return 1
+    try:
+        if args.check:
+            pack = rulepack.read_pack(data)
+            active = rulepack.load_active_rules()
+            newer = version_key(pack.version) > version_key(active.version)
+            say(f"Newer rules available: {pack.version} (you have {active.version}). Run: owltriage update-rules"
+                if newer else f"Rules are up to date: {_describe(active)}.")
+            return 0
+        result = rulepack.install_pack(data)
+    except rulepack.PackError as exc:
+        err.print(Text(f"Rules pack rejected: {exc}. Nothing was changed.", style="bold red"))
+        return 1
+    if result.status == "not-newer":
+        say(f"Rules are already up to date: {result.before} is in use (the pack offered is {result.pack.version}).")
+        return 0
+    say(Text(f"Rules updated: {result.before} -> {result.after} (signed pack, {result.rules} rules)", style="bold green"))
+    if result.added:
+        say(f"  new: {', '.join(result.added)}")
+    if result.removed:
+        say(f"  removed: {', '.join(result.removed)}")
+    detail = f"  signed with key {result.pack.key_id}" + (f", built from {result.pack.source}" if result.pack.source else "")
+    say(Text(detail + "; undo with: owltriage update-rules --rollback", style="dim"))
+    return 0
+
+
 def _utf8_stdio() -> None:
     """Windows pipes and redirects default to a legacy code page (cp1252) that can't encode the
     owl, the bar or non-ASCII log content; without this, `owltriage hunt x > report.txt` crashes."""
@@ -381,7 +449,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     console = make_console(record=bool(svg), width=SVG_WIDTH if svg else None,
                            quiet=getattr(args, "quiet", False) and not svg)
     err = Console(stderr=True, highlight=False)
-    handler = {"hunt": cmd_hunt, "alert": cmd_alert, "rules": cmd_rules, "update-feeds": cmd_update_feeds}
+    handler = {"hunt": cmd_hunt, "alert": cmd_alert, "rules": cmd_rules, "update-feeds": cmd_update_feeds,
+               "update-rules": cmd_update_rules}
     code = handler[args.command](args, console, err)
     if svg:
         svg.parent.mkdir(parents=True, exist_ok=True)

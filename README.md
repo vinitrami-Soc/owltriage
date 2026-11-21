@@ -131,6 +131,7 @@ It is not a SIEM, an EDR or an auto-blocker. It reads the logs you give it and t
 | Make brute-force detection stricter or looser | `owltriage hunt auth.log --threshold 10 --window 300` |
 | Hunt last year's syslog files | `owltriage hunt auth.log.1 --year 2025` |
 | Use free threat feeds | `owltriage update-feeds` once a day, then hunt as usual |
+| Get new detections without reinstalling | `owltriage update-rules` (weekly from cron is plenty) |
 | Add my own blocklist | `owltriage hunt auth.log --bad-ips our-blocklist.txt` |
 | Run it from cron or CI | `owltriage hunt logs/*.log --fail-on high --quiet` (exit code 1 on high or critical) |
 | Get plain output, no owl | `owltriage hunt auth.log --no-anim` (or set `OWLTRIAGE_NO_ANIM=1`) |
@@ -230,6 +231,11 @@ Tune built-in rules without forking. Put this in `my-rules/tuning.yml`:
 - id: win-kerberoasting
   enabled: false
 ```
+
+New detections reach you without a new release. `owltriage update-rules` installs the newest signed
+rules pack, after checking its signature, that it is newer than your rules, and that every rule passes its
+own tests. `--rollback` undoes it, and `--file` works on offline networks
+([details](docs/CONFIGURATION.md#owltriage-update-rules)).
 
 Rule types (`web`, `command`, `line`, `event`, `correlation`), every rule field and the quality checklist
 are in [docs/RULES.md](docs/RULES.md).

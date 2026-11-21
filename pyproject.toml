@@ -35,7 +35,7 @@ dependencies = [
 
 [project.optional-dependencies]
 evtx = ["evtx>=0.8"]  # kept so `owltriage[evtx]` from older instructions keeps working
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "hypothesis>=6.0", "ruff>=0.4", "stix2>=3.0"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "hypothesis>=6.0", "ruff>=0.4", "stix2>=3.0", "cryptography>=41"]
 
 [project.scripts]
 owltriage = "owltriage.cli:main"
@@ -51,7 +51,7 @@ version = { attr = "owltriage.__version__" }
 include = ["owltriage*"]
 
 [tool.setuptools.package-data]
-owltriage = ["rules/*.yml", "resources/*.yml", "resources/*.json", "resources/samples/*"]
+owltriage = ["rules/*.yml", "rules/VERSION", "resources/*.yml", "resources/*.json", "resources/samples/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

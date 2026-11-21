@@ -24,6 +24,7 @@ owltriage hunt [LOGS...] [options]   # analyze log files offline
 owltriage alert [ALERT_FILE] [opts]  # enrich Wazuh alerts, notify, open cases
 owltriage rules {list,test} [IDS]    # inspect and self-test detection rules
 owltriage update-feeds [options]     # download free IP threat feeds
+owltriage update-rules [options]     # install the newest signed detection rules
 owltriage --version
 owltriage                            # no arguments: shows the logo and usage
 ```
@@ -153,6 +154,43 @@ the run.
 
 ---
 
+## `owltriage update-rules`
+
+New detections are published as a signed **rules pack**, so you get them without reinstalling owltriage.
+
+```bash
+owltriage update-rules                               # download, verify and install the newest pack
+owltriage update-rules --check                       # only say whether newer rules exist
+owltriage update-rules --file owltriage-rules.json   # offline network: a pack downloaded elsewhere
+owltriage update-rules --rollback                    # the previous pack, or back to the built-in rules
+```
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--check` | off | Verify the published pack and compare versions. Installs nothing. |
+| `--file PACK` | - | Install a pack file instead of downloading one. For air-gapped networks. |
+| `--url URL` | the `rules-pack` branch on GitHub | Download from somewhere else, such as an internal mirror. HTTPS only. |
+| `--rollback` | off | Undo the last update: the previous pack if there is one, else the built-in rules. |
+| `--quiet` | off | Print only problems, to stderr. For cron. |
+
+A pack is installed only if every check passes. Otherwise nothing changes and the command exits `1`.
+
+1. It is signed with the maintainers' key, which is built into owltriage. One changed byte fails the check.
+2. It is newer than the rules in use. An older pack, even a genuine one, is refused.
+3. It is written for a rules engine this owltriage reads. If not, you are asked to upgrade owltriage.
+4. Every rule loads and passes its own `match` and `no_match` examples.
+5. It still finds the attacks in the bundled samples.
+
+The pack is kept in `~/.local/share/owltriage/rules-pack/` and its signature is checked again on every run.
+If that check fails, or a newer owltriage ships newer built-in rules, the built-in rules are used and a
+warning says why. Your own `--rules-dir` rules still apply on top. `owltriage rules list` shows which rules
+are in use, and `owltriage --version` shows the version of the built-in ones.
+
+Exit codes: `0` installed, already up to date, or check done; `1` download failed or pack rejected; `2` bad
+options or an unreadable `--file`.
+
+---
+
 ## `.env` settings
 
 `owltriage alert` reads these settings; `hunt` needs none of them. Copy [`.env.example`](../.env.example) to
@@ -186,6 +224,9 @@ These apply to every command.
 |---|---|
 | `OWLTRIAGE_FEEDS_DIR` | Default feed cache directory (instead of `~/.cache/owltriage/feeds`). |
 | `XDG_CACHE_HOME` | Standard cache root; the default feed cache is `$XDG_CACHE_HOME/owltriage/feeds`. |
+| `OWLTRIAGE_RULES_PACK_DIR` | Where `update-rules` keeps the installed pack (instead of `~/.local/share/owltriage/rules-pack`). |
+| `XDG_DATA_HOME` | Standard data root; the default pack folder is `$XDG_DATA_HOME/owltriage/rules-pack`. |
+| `OWLTRIAGE_RULES_URL` | Default download address for `update-rules`, such as an internal HTTPS mirror. |
 | `OWLTRIAGE_NO_ANIM` | Any value turns the owl animation off, like `--no-anim` on every run. |
 | `CI` | Set by CI systems; the animation stays off. |
 | `NO_COLOR` | Any value turns colors off ([no-color.org](https://no-color.org)). |
@@ -324,6 +365,7 @@ Then `/etc/cron.d/owltriage`. Cron's default `PATH` is only `/usr/bin:/bin`, so 
 PATH=/usr/local/bin:/usr/bin:/bin
 OWLTRIAGE_FEEDS_DIR=/var/lib/owltriage/feeds
 5 3 * * *    root  owltriage update-feeds --quiet
+20 3 * * 1   root  owltriage update-rules --quiet
 */15 * * * * root  owltriage-cron
 ```
 
@@ -340,6 +382,8 @@ owltriage hunt auth.log --allow 192.0.2.0/24 --allow 198.51.100.7 --threshold 15
 ```
 
 **An air-gapped analysis box:** run `owltriage update-feeds` on a connected machine, copy
-`~/.cache/owltriage/feeds/` across, and point `--feeds-dir` (or `OWLTRIAGE_FEEDS_DIR`) at it.
+`~/.cache/owltriage/feeds/` across, and point `--feeds-dir` (or `OWLTRIAGE_FEEDS_DIR`) at it. For rules,
+download `owltriage-rules.json` from the `rules-pack` branch, carry it across and run
+`owltriage update-rules --file owltriage-rules.json`. The signature is checked there too.
 
 **Wazuh:** to enrich alerts automatically, follow [docs/WAZUH.md](WAZUH.md).

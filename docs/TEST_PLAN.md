@@ -9,7 +9,7 @@ pip install -e ".[dev]"
 owltriage rules test                     # every rule's match / no_match examples
 python -m pytest -q                       # full suite (~50 s)
 python -m pytest --cov=owltriage         # with coverage
-ruff check owltriage tests main.py
+ruff check owltriage tests tools main.py
 
 # regression on ~280 real attack recordings (also a CI job)
 git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx-samples

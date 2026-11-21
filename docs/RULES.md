@@ -120,3 +120,33 @@ Files in `--rules-dir` are merged on top of the packaged rules. If an `id` alrea
 6. Prefer behavior that is hard to rename away (the PortProxy registry key) over names an
    attacker controls (a renamed `psexec.exe`).
 7. Note known false positives in `false_positives:`.
+
+## Rule versions
+
+Any change to a rule file needs a new version in `owltriage/rules/VERSION`: today's date as `YYYY.MM.DD`
+(add `.2`, `.3` for more changes the same day). Rules packs are compared by this version, so a change
+without a new version would never reach users. `pytest tests/test_rules_version.py` fails until you bump
+it, and prints the new `digest` line to paste in.
+
+## Publishing rules packs (maintainers)
+
+On every push to `main` that changes a rule, the **Rules pack** workflow runs the rule tests, signs the
+rules with the `RULES_SIGNING_KEY` secret and publishes `owltriage-rules.json` on the `rules-pack` branch.
+Users get it with `owltriage update-rules`, without a new owltriage release. Without the secret the
+workflow runs its checks and publishes nothing.
+
+One-time setup:
+
+1. Make a key with `python tools/rulepack.py keygen` (or `openssl rand -base64 32`). The value is
+   the secret: it goes into GitHub and nowhere else.
+2. In the repository on GitHub, open Settings, then Environments, and create `rules-pack`. Add the
+   environment secret `RULES_SIGNING_KEY`. Optionally add yourself under Required reviewers, so every
+   pack waits for your approval before it is signed.
+3. Run the workflow once (Actions, Rules pack, Run workflow). Its log shows the public key, and it fails
+   until that key is listed in `TRUSTED_KEYS` in `owltriage/rulepack.py`. Add it there and push.
+4. Packs are accepted by owltriage versions that contain the key, so ship it in the next release.
+
+To rotate the key, add the new public key to `TRUSTED_KEYS` next to the old one, release, then replace
+the secret; drop the old key a release later. If the secret leaks, remove its key from `TRUSTED_KEYS`,
+release, and make a new key. Installs that have not upgraded still trust the old key until they do.
+

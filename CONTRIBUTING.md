@@ -17,7 +17,7 @@ pip install -e ".[dev]"
 owltriage hunt --demo          # sanity check
 owltriage rules test           # every rule's examples
 python -m pytest -q             # full suite (~45 s)
-ruff check owltriage tests main.py
+ruff check owltriage tests tools main.py
 ```
 
 Optional: run the regression suite against ~280 real attack recordings:
@@ -27,7 +27,7 @@ git clone --depth 1 https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES /tmp/evtx
 OWLTRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evtx.py
 ```
 
-## Adding a rule in 5 steps
+## Adding a rule in 6 steps
 
 1. Find the right file in `owltriage/rules/` (`web.yml`, `commands.yml`, `linux.yml`,
    `windows.yml`) or create a new `.yml` file there.
@@ -35,7 +35,9 @@ OWLTRIAGE_EVTX_SAMPLES=/tmp/evtx-samples python -m pytest -q tests/test_real_evt
 3. If you use a new ATT&CK technique, add it to `owltriage/resources/attack.yml` with the
    official name from attack.mitre.org.
 4. `owltriage rules test your-rule-id`
-5. If the attack is in EVTX-ATTACK-SAMPLES, add the file to `EXPECTED` in
+5. Bump `owltriage/rules/VERSION` to today's date. `pytest tests/test_rules_version.py` prints the new
+   digest. This is how the change reaches users through `owltriage update-rules`.
+6. If the attack is in EVTX-ATTACK-SAMPLES, add the file to `EXPECTED` in
    `tests/test_real_evtx.py` so it stays detected.
 
 ## Ground rules

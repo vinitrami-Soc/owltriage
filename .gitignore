@@ -3,7 +3,8 @@
 .env.*
 !.env.example
 
-# Generated reports, block scripts, payloads
+# Generated reports, block scripts, payloads, locally built rules packs
+/owltriage-rules.json
 owltriage-output/
 output/
 

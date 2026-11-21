@@ -1,0 +1,90 @@
+name: Rules pack
+
+# Signs the detection rules on main into a rules pack and publishes it on the `rules-pack` branch,
+# where `owltriage update-rules` downloads it. Rules reach users without a new owltriage release.
+# Needs the RULES_SIGNING_KEY secret (docs/RULES.md, "Publishing rules packs"); without it the
+# workflow runs its checks and publishes nothing.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "owltriage/rules/**"
+      - "owltriage/rulepack.py"
+      - "owltriage/ed25519.py"
+      - "tools/rulepack.py"
+      - ".github/workflows/rules-pack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rules-pack
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: sign and publish
+    runs-on: ubuntu-latest
+    # Optional gate: give this environment "Required reviewers" in Settings > Environments and
+    # every pack waits for your approval before it is signed.
+    environment: rules-pack
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+
+      - name: Rule self-tests and pack tests
+        run: |
+          owltriage rules test
+          python -m pytest -q tests/test_rules.py tests/test_rules_version.py tests/test_rulepack.py tests/test_ed25519.py tests/test_rulepack_tool.py
+
+      - name: Check the signing key
+        id: key
+        env:
+          RULES_SIGNING_KEY: ${{ secrets.RULES_SIGNING_KEY }}
+        run: |
+          if [ -z "$RULES_SIGNING_KEY" ]; then
+            echo "::notice::RULES_SIGNING_KEY is not set, so no rules pack is published (docs/RULES.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            python tools/rulepack.py pubkey --require-trusted
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and sign the pack
+        id: build
+        if: steps.key.outputs.ready == 'true'
+        env:
+          RULES_SIGNING_KEY: ${{ secrets.RULES_SIGNING_KEY }}
+        run: |
+          python tools/rulepack.py build owltriage-rules.json --source "$GITHUB_SHA"
+          if git fetch --depth 1 origin rules-pack; then
+            git show FETCH_HEAD:owltriage-rules.json > "$RUNNER_TEMP/published.json" || true
+          fi
+          python tools/rulepack.py decide owltriage-rules.json --published "$RUNNER_TEMP/published.json" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to the rules-pack branch
+        if: steps.build.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pack="$RUNNER_TEMP/pack"
+          if git fetch --depth 1 origin rules-pack; then
+            git worktree add -B rules-pack "$pack" FETCH_HEAD
+          else
+            git worktree add --detach "$pack"
+            git -C "$pack" checkout -q --orphan rules-pack
+            git -C "$pack" rm -rfq .
+          fi
+          cp owltriage-rules.json "$pack/owltriage-rules.json"
+          cp tools/rules-pack-branch.md "$pack/README.md"
+          git -C "$pack" add owltriage-rules.json README.md
+          git -C "$pack" commit -q -m "Rules pack $VERSION from ${GITHUB_SHA::7}"
+          git -C "$pack" push origin rules-pack
+          echo "::notice::Published rules pack $VERSION"

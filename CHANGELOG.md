@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- `owltriage update-rules`: new detection rules arrive as a signed rules pack, without a new owltriage
+  release. A pack is installed only if its Ed25519 signature matches the maintainers' key built into
+  owltriage (checked in pure Python, no new dependency), it is newer than the rules in use, every rule
+  passes its own examples and it still finds the attacks in the bundled samples. `--check` looks without
+  installing, `--file` serves offline networks, `--rollback` undoes an update. The installed pack is
+  re-verified on every run; if that fails, owltriage falls back to the built-in rules and says so.
+- The built-in rules have a version (`owltriage/rules/VERSION`), shown by `owltriage --version`;
+  `owltriage rules list` shows which rules are in use. A test fails when a rule changes without a new version.
+- The `Rules pack` GitHub workflow signs and publishes packs to the `rules-pack` branch on every rule change
+  (docs/RULES.md, "Publishing rules packs").
 - Windows: ntds.dit theft through Windows Server Backup. `wbadmin` backing up or restoring the AD database by
   name (`-include:` / `-items:` naming `ntds.dit`) now raises `cmd-ntds-dump`. This is the step Akira used in
   The DFIR Report's June 2026 case, and the one a replay of 2026 ransomware playbooks missed. Routine
