@@ -2,5 +2,5 @@
 # replaces them only when its version is newer, so bump this whenever any rule file changes:
 #   version: today's date, YYYY.MM.DD (add .2, .3 for a second or third change that day)
 #   digest:  tests/test_rules_version.py prints the new value when it is out of date
-version: 2026.11.21
-digest: sha256:6a126ca5a7e9ea57e9a40658e2b66f363c121dc6a339fc2981b1afc781eb00e7
+version: 2026.11.21.2
+digest: sha256:3907ea55f144634c88af89c6f3d36edd751342fe34ac28565adf545f1f114cf0

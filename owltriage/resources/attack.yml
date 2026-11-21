@@ -26,7 +26,7 @@ T1110.003: {name: "Brute Force: Password Spraying", tactics: [credential-access]
 T1136.001: {name: "Create Account: Local Account", tactics: [persistence]}
 T1140: {name: Deobfuscate/Decode Files or Information, tactics: [defense-evasion]}
 T1190: {name: Exploit Public-Facing Application, tactics: [initial-access]}
-T1222.002: {name: "File and Directory Permissions Modification: Linux and Mac File and Directory Permissions Modification", tactics: [defense-evasion]}
+T1222.002: {name: "File and Directory Permissions Modification: Linux and Mac Permissions", tactics: [defense-evasion]}
 T1490: {name: Inhibit System Recovery, tactics: [impact]}
 T1543.003: {name: "Create or Modify System Process: Windows Service", tactics: [persistence, privilege-escalation]}
 T1548.003: {name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching", tactics: [privilege-escalation, defense-evasion]}
