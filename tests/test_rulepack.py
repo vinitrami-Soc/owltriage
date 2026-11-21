@@ -50,6 +50,15 @@ def trusted(monkeypatch):
 
 
 # -- reading and checking a pack --------------------------------------------------------------
+def test_the_built_in_trusted_keys_are_well_formed():
+    """A typo when pasting a key would make every real pack fail; catch it here instead."""
+    assert rulepack.TRUSTED_KEYS
+    for kid, encoded in rulepack.TRUSTED_KEYS.items():
+        public = base64.b64decode(encoded, validate=True)
+        assert len(public) == 32 and rulepack.key_id(public) == kid
+        assert ed25519._decompress(public) is not None                   # a real curve point
+
+
 def test_a_signed_pack_round_trips():
     pack = read_pack(make_pack(), TRUSTED)
     assert pack.version == "2099.01.01" and pack.key_id == rulepack.key_id(PUBLIC)

@@ -34,7 +34,9 @@ DEFAULT_PACK_URL = "https://raw.githubusercontent.com/vinitrami-Soc/owltriage/ru
 MAX_PACK_BYTES = 5_000_000
 MAX_FILES = 100
 # key id -> base64 Ed25519 public key of the maintainers' signing key. Packs signed by any other key are refused.
-TRUSTED_KEYS: Dict[str, str] = {}
+TRUSTED_KEYS: Dict[str, str] = {
+    "a77de81789f12469": "NbjyjtrYerl3XgEPlJazBImAq6BfLv/8hEM4GItUyss=",   # RULES_SIGNING_KEY, 2026-11-21
+}
 SAMPLES = Path(__file__).resolve().parent / "resources" / "samples"
 SAMPLE_LOGS = ("auth.log", "access.log", "windows_security.xml")
 _VERSION = re.compile(r"^\d{4}\.\d{2}\.\d{2}(?:\.\d{1,3})?$")
