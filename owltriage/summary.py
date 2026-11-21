@@ -18,6 +18,7 @@ HUMAN = {
     "SENSITIVE_FILE_PROBE": "secret-file probing", "SCANNER_USER_AGENT": "vulnerability scanning",
     "BAD_IP_MATCH": "known-bad IP", "BRUTE_FORCE": "brute force", "C2_INDICATOR": "C2 server",
     "BASE64_PAYLOAD": "encoded payload", "SUSPICIOUS_COMMAND": "malicious command",
+    "KNOWN_EXPLOITED_CVE": "probing for a known-exploited CVE",
 }
 # Order in which an IP's activity is described: the attack itself first, the noise last.
 PRIORITY = ["SQL_INJECTION", "COMMAND_INJECTION", "LOG4SHELL", "SHELLSHOCK", "PATH_TRAVERSAL", "XSS",

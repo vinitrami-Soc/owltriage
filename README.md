@@ -235,7 +235,9 @@ Tune built-in rules without forking. Put this in `my-rules/tuning.yml`:
 New detections reach you without a new release. `owltriage update-rules` installs the newest signed
 rules pack, after checking its signature, that it is newer than your rules, and that every rule passes its
 own tests. `--rollback` undoes it, and `--file` works on offline networks
-([details](docs/CONFIGURATION.md#owltriage-update-rules)).
+([details](docs/CONFIGURATION.md#owltriage-update-rules)). A weekly watch turns newly known-exploited CVEs
+and MITRE ATT&CK changes into an issue and a pull request of candidate rules for a maintainer to review
+([how it works](docs/RULES.md#the-weekly-rule-watch)).
 
 Rule types (`web`, `command`, `line`, `event`, `correlation`), every rule field and the quality checklist
 are in [docs/RULES.md](docs/RULES.md).

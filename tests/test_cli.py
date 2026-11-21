@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from owltriage.rules import load_rules
+
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "owltriage" / "resources" / "samples"
 SECRET_VARS = ("VT_API_KEY", "ABUSEIPDB_API_KEY", "DISCORD_WEBHOOK_URL", "SLACK_WEBHOOK_URL",
@@ -122,12 +124,15 @@ def test_rules_test_and_list(tmp_path):
     assert run.returncode == 0 and "rules passed" in run.stdout
     listing = cli("rules", "list", "--type", "event")
     assert "win-dcsync" in listing.stdout and "web-xss" not in listing.stdout
-    assert "17 event rules" in listing.stdout                  # the count follows the filter
+    builtin = load_rules().rules.values()                       # counts follow the rule files (rule watch adds some)
+    events, webs = sum(r.type == "event" for r in builtin), sum(r.type == "web" for r in builtin)
+    assert events >= 17 and webs >= 14
+    assert f"{events} event rules" in listing.stdout            # the count follows the filter
     rules = tmp_path / "rules"
     rules.mkdir()
     (rules / "off.yml").write_text("- id: web-xss\n  enabled: false\n", encoding="utf-8")
     web = cli("rules", "list", "--type", "web", "--rules-dir", rules, columns=80)
-    assert "14 web rules" in web.stdout and "XSS: script injection" in web.stdout
+    assert f"{webs} web rules" in web.stdout and "XSS: script injection" in web.stdout
     assert web.stdout.count("(disabled)") == 1
     assert max(len(line) for line in web.stdout.splitlines()) <= 80   # titles fit an 80-column terminal
     (rules / "bad.yml").write_text("- id: web-broken\n  name: BROKEN\n  title: x\n  type: web\n  severity: low\n"

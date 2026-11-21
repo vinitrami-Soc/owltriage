@@ -1,0 +1,104 @@
+name: Rule watch
+
+# Every Monday: CISA's newly known-exploited CVEs and MITRE ATT&CK changes become one issue, and
+# candidate web rules (from public nuclei templates) plus ATT&CK name fixes become a pull request.
+# Nothing reaches users until a maintainer merges; the merge then publishes a signed rules pack.
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: rule-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+
+      - name: Download the sources
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/watch"
+          mkdir -p "$d"
+          get() { curl -fsSL --retry 3 --max-time 300 -o "$d/$1" "$2"; }
+          get kev.json https://raw.githubusercontent.com/cisagov/kev-data/main/known_exploited_vulnerabilities.json
+          get nuclei-cves.json https://raw.githubusercontent.com/projectdiscovery/nuclei-templates/main/cves.json
+          get attack.json https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
+          get benign.log "https://raw.githubusercontent.com/elastic/examples/master/Common%20Data%20Formats/apache_logs/apache_logs"
+
+      - name: Read earlier rule-watch issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create rule-watch --color 5319E7 --description "Weekly rule watch" --force
+          gh issue list --label rule-watch --state all --limit 500 --json body --jq '.[].body' > "$RUNNER_TEMP/watch/previous.txt"
+
+      - name: Watch
+        id: watch
+        run: |
+          d="$RUNNER_TEMP/watch"
+          python tools/rule_watch.py --kev "$d/kev.json" --nuclei-index "$d/nuclei-cves.json" --attack "$d/attack.json" \
+            --benign "$d/benign.log" --previous "$d/previous.txt" --issue "$d/issue.md" --pr "$d/pr.md" >> "$GITHUB_OUTPUT"
+
+      - name: Test the proposed changes
+        id: check
+        if: steps.watch.outputs.changes == 'true'
+        continue-on-error: true
+        run: |
+          owltriage rules test
+          python -m pytest -q
+
+      - name: Propose the changes
+        id: propose
+        if: steps.watch.outputs.changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK: ${{ steps.check.outcome }}
+        run: |
+          set -euo pipefail
+          day="$(date -u +%F)"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          branch="rule-watch/$day-$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"   # a re-run gets its own branch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -q -c "$branch"
+          git add owltriage/rules owltriage/resources/attack.yml
+          git commit -q -m "Rule watch $day: candidate rules and ATT&CK names"
+          git push -q origin "$branch"
+          body="$RUNNER_TEMP/watch/pr.md"
+          if [ "$CHECK" = success ]; then
+            printf '\nThe full test suite passed on these changes: %s\n(CI does not start for pull requests a workflow opens.)\n' "$run_url" >> "$body"
+            if url=$(gh pr create --base main --head "$branch" --title "Rule watch $day: candidate rules" \
+                       --label rule-watch --body-file "$body" 2> "$RUNNER_TEMP/pr-error.txt"); then
+              line="Pull request with the proposed changes: $url"
+            else
+              echo "::warning::Could not open a pull request ($(head -c 300 "$RUNNER_TEMP/pr-error.txt")). Allow it in Settings > Actions > General > Workflow permissions, or use the link in the issue."
+              line="Proposed changes are on branch \`$branch\`: [open a pull request]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch?expand=1)"
+            fi
+          else
+            line="Proposed changes are on branch \`$branch\`, but tests failed on them ($run_url). Fix them before opening a pull request."
+          fi
+          echo "line=$line" >> "$GITHUB_OUTPUT"
+
+      - name: Open the weekly issue
+        if: steps.watch.outputs.report == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROPOSAL: ${{ steps.propose.outputs.line }}
+        run: |
+          set -euo pipefail
+          body="$RUNNER_TEMP/watch/issue.md"
+          if [ -n "$PROPOSAL" ]; then printf '\n%s\n' "$PROPOSAL" >> "$body"; fi
+          gh issue create --title "Rule watch: $(date -u +%F)" --label rule-watch --body-file "$body"

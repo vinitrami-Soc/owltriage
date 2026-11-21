@@ -11,6 +11,11 @@
   re-verified on every run; if that fails, owltriage falls back to the built-in rules and says so.
 - The built-in rules have a version (`owltriage/rules/VERSION`), shown by `owltriage --version`;
   `owltriage rules list` shows which rules are in use. A test fails when a rule changes without a new version.
+- Weekly rule watch (`Rule watch` workflow, `tools/rule_watch.py`): new entries in CISA's Known Exploited
+  Vulnerabilities and MITRE ATT&CK changes become an issue; candidate web rules generated from public nuclei
+  templates (kept only if they pass their own examples and stay quiet on a benign access log) and ATT&CK
+  name fixes become a pull request with the rules version bumped. Nothing is merged automatically.
+- `rules list` counts in the tests follow the rule files, so added rules do not break the suite.
 - The `Rules pack` GitHub workflow signs and publishes packs to the `rules-pack` branch on every rule change
   (docs/RULES.md, "Publishing rules packs").
 - Windows: ntds.dit theft through Windows Server Backup. `wbadmin` backing up or restoring the AD database by

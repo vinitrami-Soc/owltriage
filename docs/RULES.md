@@ -146,6 +146,30 @@ One-time setup:
    until that key is listed in `TRUSTED_KEYS` in `owltriage/rulepack.py`. Add it there and push.
 4. Packs are accepted by owltriage versions that contain the key, so ship it in the next release.
 
+## The weekly rule watch
+
+Every Monday the **Rule watch** workflow (`tools/rule_watch.py`) looks at what changed outside the repo:
+
+- **CISA's Known Exploited Vulnerabilities.** Entries added in the last 30 days and not reported before go
+  into one issue, labelled `rule-watch`, with known ransomware use and whether a public nuclei template
+  exists. Rows without a rule need a person: would the attack show in the logs OwlTriage reads?
+- **Candidate web rules.** For a new KEV CVE whose nuclei template requests a distinctive path (not `/`,
+  `/login` or `/v1/users/me`), the watch writes a rule into `owltriage/rules/web-kev.yml`: `medium`
+  severity, `high` if ransomware is known to use the CVE. A candidate is dropped if it fails its own
+  examples or matches anything in a benign access log (Elastic's public Apache sample).
+- **MITRE ATT&CK.** Technique names MITRE changed are fixed in `owltriage/resources/attack.yml`. Revoked
+  or deprecated techniques are reported in the issue with the replacement and the rules that use them,
+  because moving a rule to another technique is a decision.
+
+Rules and name fixes arrive as a pull request, after the whole test suite passed on them, with
+`owltriage/rules/VERSION` already bumped. Review each path: a rule is only useful if normal use of the
+product does not call it. Merging publishes the next signed rules pack. Nothing is merged automatically.
+
+For the workflow to open the pull request itself, allow it once in Settings, Actions, General, Workflow
+permissions ("Allow GitHub Actions to create and approve pull requests"). Without that, the changes wait on
+a `rule-watch/...` branch and the issue links to a one-click "open a pull request" page. Run it any time
+from Actions, Rule watch, Run workflow; locally, `python tools/rule_watch.py --help` lists the inputs.
+
 To rotate the key, add the new public key to `TRUSTED_KEYS` next to the old one, release, then replace
 the secret; drop the old key a release later. If the secret leaks, remove its key from `TRUSTED_KEYS`,
 release, and make a new key. Installs that have not upgraded still trust the old key until they do.
